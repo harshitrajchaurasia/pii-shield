@@ -961,7 +961,6 @@ PI_Removal/
 │
 ├── output/                   # Processed files
 └── docs/                     # Documentation
-    ├── CLAUDE.md
     ├── README.md
     ├── MEMORY.md
     ├── API_REFERENCE.md
@@ -1450,7 +1449,7 @@ python -m pi_remover --config config.yaml -i data.csv
 |------|---------|
 | `MEMORY.md` | Complete project learnings (this file) |
 | `CHAT_SERVICE.md` | Chat service deployment guide |
-| `CLAUDE.md` | Project context and background |
+
 | `GOOGLE_CLOUD.md` | GCP deployment reference |
 | `README_PI_Remover.md` | User documentation |
 | `LLM_Orchestration_Guide.md` | LLM orchestration guide |
