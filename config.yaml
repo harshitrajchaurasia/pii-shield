@@ -1,0 +1,280 @@
+# =============================================================================
+# PI REMOVER ENTERPRISE CONFIGURATION
+# =============================================================================
+# Version: 2.3.0
+# This configuration file controls all aspects of PI detection and redaction.
+# Copy this file to customize settings for different environments.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# GENERAL SETTINGS
+# -----------------------------------------------------------------------------
+general:
+  # Output directory for cleaned files (relative to input file or absolute path)
+  output_dir: "output"
+  
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  log_level: "INFO"
+  
+  # Number of worker processes (0 = auto-detect based on CPU cores)
+  num_workers: 0
+  
+  # Batch size for processing
+  batch_size: 5000
+  
+  # Enable progress bars
+  show_progress: true
+
+# -----------------------------------------------------------------------------
+# DATA CLEANING / PREPROCESSING (v2.3)
+# -----------------------------------------------------------------------------
+# Clean data BEFORE PI detection for improved accuracy
+data_cleaning:
+  # Enable/disable preprocessing
+  enabled: true
+  
+  # Normalize Unicode characters (smart quotes -> regular quotes, etc.)
+  normalize_unicode: true
+  
+  # Decode HTML entities (&nbsp; -> space, &amp; -> &, etc.)
+  decode_html: true
+  
+  # Normalize whitespace (collapse multiple spaces, fix newlines)
+  normalize_whitespace: true
+  
+  # Strip control characters (except tabs and newlines)
+  strip_control_chars: true
+  
+  # Fix common encoding issues (mojibake)
+  fix_encoding: true
+  
+  # Normalize phone number formats before pattern matching
+  normalize_phone_formats: true
+
+# -----------------------------------------------------------------------------
+# DETECTION ENGINES
+# -----------------------------------------------------------------------------
+engines:
+  # Enable/disable detection engines
+  regex: true
+  ner: true              # spaCy Named Entity Recognition
+  dictionaries: true     # Dictionary-based name matching
+  context_rules: true    # Contextual rules for signature blocks, etc.
+
+# -----------------------------------------------------------------------------
+# PI TYPES TO DETECT
+# -----------------------------------------------------------------------------
+pi_types:
+  # Personal identifiers
+  names: true
+  emails: true
+  phones: true
+  employee_ids: true
+  
+  # Infrastructure
+  asset_ids: true
+  ip_addresses: true
+  hostnames: true
+  urls: true
+  
+  # Financial & Government
+  government_ids: true    # Aadhaar, PAN, Passport
+  credit_cards: true
+  upi_ids: true
+  
+  # Security
+  credentials: true       # Passwords, API keys
+  
+  # Context-aware
+  signature_blocks: true
+  windows_paths: true
+  
+  # Organizations
+  companies: true
+  locations: true
+
+# -----------------------------------------------------------------------------
+# REPLACEMENT TOKENS
+# -----------------------------------------------------------------------------
+tokens:
+  # Use typed tokens like [EMAIL], [PHONE] instead of generic [REDACTED]
+  use_typed: true
+  
+  # Default replacement token (when use_typed is false)
+  default: "[REDACTED]"
+  
+  # Custom tokens for specific PI types (optional)
+  # custom:
+  #   email: "[EMAIL_REDACTED]"
+  #   phone: "[PHONE_REDACTED]"
+
+# -----------------------------------------------------------------------------
+# EXCLUSIONS / WHITELIST
+# -----------------------------------------------------------------------------
+# Items in these lists will NOT be redacted even if detected
+exclusions:
+  # Domain names to preserve (support emails, company domains)
+  domains:
+    - "support@example.com"
+    - "helpdesk@example.com"
+    - "noreply@example.com"
+    - "service-desk@example.com"
+    
+  # Phone numbers to preserve (helpdesk, toll-free)
+  phones:
+    - "1800"               # Preserve all 1800 toll-free prefixes
+    - "+1-800"
+    - "1-800"
+    
+  # Terms/patterns to never redact (case-insensitive)
+  terms:
+    - "ServiceNow"
+    - "JIRA"
+    - "Confluence"
+    - "Microsoft"
+    - "Google"
+    - "Windows"
+    - "Linux"
+    - "MacOS"
+    
+  # IP ranges to preserve (e.g., documentation ranges)
+  ip_ranges:
+    - "192.0.2.0/24"       # Documentation range (RFC 5737)
+    - "198.51.100.0/24"    # Documentation range
+    - "203.0.113.0/24"     # Documentation range
+
+# -----------------------------------------------------------------------------
+# CUSTOM PATTERNS
+# -----------------------------------------------------------------------------
+# Add your own regex patterns for PI detection
+custom_patterns:
+  # Example: Custom employee ID format
+  # - name: "CUSTOM_EMP_ID"
+  #   pattern: "EMP-[0-9]{6}"
+  #   replacement: "[EMP_ID]"
+  #   enabled: true
+  
+  # Example: Internal ticket numbers
+  # - name: "TICKET_ID"
+  #   pattern: "INC[0-9]{7,10}"
+  #   replacement: "[TICKET]"
+  #   enabled: false
+
+# -----------------------------------------------------------------------------
+# FILE PROCESSING
+# -----------------------------------------------------------------------------
+files:
+  # Supported file types and their settings
+  csv:
+    encoding: "utf-8"
+    on_bad_lines: "skip"    # skip, warn, or error
+    
+  excel:
+    engine: "openpyxl"      # openpyxl for .xlsx, xlrd for .xls
+    sheet_name: 0           # Sheet index or name (0 = first sheet, or "Sheet1")
+    
+  # Column suffix for cleaned columns
+  cleaned_suffix: "_cleaned"
+
+# -----------------------------------------------------------------------------
+# INTERNATIONAL PHONE PATTERNS
+# -----------------------------------------------------------------------------
+# Enable/disable phone patterns by country
+phone_patterns:
+  india: true               # +91, 91, 0XXXXXXXXXX
+  usa: true                 # +1, 1-XXX-XXX-XXXX
+  uk: true                  # +44, 0XXXXXXXXXX
+  australia: true           # +61
+  germany: true             # +49
+  france: true              # +33
+  singapore: true           # +65
+  uae: true                 # +971
+  canada: true              # +1 (same as USA)
+  brazil: true              # +55
+  japan: true               # +81
+  china: true               # +86
+  toll_free: true           # 1-800, 1800, 800-XXX-XXXX
+
+# -----------------------------------------------------------------------------
+# NER SETTINGS
+# -----------------------------------------------------------------------------
+ner:
+  # spaCy model to use
+  model: "en_core_web_lg"
+  
+  # Entity types to extract
+  entity_types:
+    - "PERSON"
+    - "ORG"
+    - "GPE"
+    - "LOC"
+  
+  # Minimum confidence threshold (0.0 - 1.0)
+  # Note: spaCy doesn't provide confidence by default, this is for future use
+  confidence_threshold: 0.0
+
+# -----------------------------------------------------------------------------
+# DICTIONARIES
+# -----------------------------------------------------------------------------
+dictionaries:
+  # Use built-in Indian name dictionary
+  indian_names: true
+  
+  # Path to custom name dictionary (one name per line)
+  # custom_names_file: "custom_names.txt"
+  
+  # Use built-in company names list
+  company_names: true
+  
+  # Path to custom company names (one name per line)
+  # custom_companies_file: "custom_companies.txt"
+
+# -----------------------------------------------------------------------------
+# ERROR HANDLING
+# -----------------------------------------------------------------------------
+error_handling:
+  # Continue processing on errors (true) or stop (false)
+  continue_on_error: true
+  
+  # Log errors to file
+  log_errors: true
+  error_log_file: "pi_remover_errors.log"
+  
+  # Maximum errors before stopping (0 = unlimited)
+  max_errors: 0
+  
+  # Include original text in error logs (may contain PI - use with caution)
+  include_original_in_log: false
+
+# -----------------------------------------------------------------------------
+# PERFORMANCE
+# -----------------------------------------------------------------------------
+performance:
+  # Enable multiprocessing
+  multiprocessing: true
+  
+  # Chunk size for file processing
+  chunk_size: 10000
+  
+  # Enable caching for repeated patterns
+  enable_cache: true
+  
+  # Maximum cache size (number of patterns)
+  max_cache_size: 10000
+
+# -----------------------------------------------------------------------------
+# AUDIT & COMPLIANCE
+# -----------------------------------------------------------------------------
+audit:
+  # Generate audit report after processing
+  generate_report: true
+  
+  # Report format: json, csv, html
+  report_format: "json"
+  
+  # Include statistics in report
+  include_stats: true
+  
+  # Include sample redactions (first N characters only)
+  include_samples: false
+  sample_length: 50

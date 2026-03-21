@@ -1,0 +1,146 @@
+# PI Remover - DEVELOPMENT Environment
+# ======================================
+# Relaxed security, verbose logging, debug endpoints enabled.
+#
+# Usage:
+#   cd docker
+#   docker-compose -f docker-compose.dev.yml up -d
+#
+# Or from project root:
+#   docker-compose -f docker/docker-compose.dev.yml up -d
+#
+# Access:
+#   API Gateway:  http://localhost:8080
+#   Web Service:  http://localhost:8082
+#   API Docs:     http://localhost:8080/docs
+
+version: '3.8'
+
+services:
+  # =========================================================================
+  # DEV API Gateway
+  # =========================================================================
+  pi-gateway-dev:
+    build:
+      context: ..
+      dockerfile: api_service/Dockerfile
+    container_name: pi-gateway-dev
+    ports:
+      - "8080:8080"
+    environment:
+      # Environment identification
+      ENVIRONMENT: development
+      
+      # Logging - verbose for debugging
+      LOG_LEVEL: DEBUG
+      
+      # Authentication - HARDCODED for dev
+      # Format: "client_id:client_secret:description,..."
+      # Includes: dev client + test client + web service (for service-to-service auth)
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-generate-a-secret-with-python-secrets-token_urlsafe-32}"
+      JWT_EXPIRY_MINUTES: 60
+      AUTH_CLIENTS: "${AUTH_CLIENTS:-pi-dev-client:change-me-dev-secret:development,pi-test-client:change-me-test-secret:testing,pi-internal-web-service:change-me-web-secret:web-service}"
+      
+      # Rate limiting - high limits for testing
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: 1000
+      RATE_LIMIT_WINDOW_SECONDS: 60
+      
+      # Features
+      ENABLE_NER: "true"
+      ENABLE_METRICS: "true"
+      ENABLE_DEBUG_ENDPOINTS: "true"
+      
+      # CORS - allow all for dev
+      CORS_ORIGINS: "*"
+      
+      # Request limits
+      MAX_TEXT_LENGTH: 100000
+      MAX_BATCH_SIZE: 100
+      
+      # Audit
+      AUDIT_LOGGING_ENABLED: "true"
+      AUDIT_TIMEZONE: "Asia/Kolkata"
+    volumes:
+      # Mount logs for easy access
+      - ../logs/dev:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    labels:
+      - "environment=development"
+      - "service=pi-gateway"
+      - "version=${VERSION:-dev}"
+    networks:
+      - pi-dev-network
+
+  # =========================================================================
+  # DEV Web Service (Hybrid Mode: API + Local Fallback)
+  # =========================================================================
+  pi-web-dev:
+    build:
+      context: ..
+      dockerfile: web_service/Dockerfile
+    container_name: pi-web-dev
+    ports:
+      - "8082:8080"
+    environment:
+      # Environment identification
+      ENVIRONMENT: development
+      
+      # Logging - verbose for debugging
+      LOG_LEVEL: DEBUG
+      
+      # =====================================================================
+      # HYBRID MODE: API Service Integration with Local Fallback
+      # =====================================================================
+      # API service URL (internal Docker network)
+      API_URL: http://pi-gateway-dev:8080
+      
+      # Service-to-service authentication credentials
+      WEB_CLIENT_ID: pi-internal-web-service
+      WEB_CLIENT_SECRET: "${WEB_CLIENT_SECRET:-change-me-web-secret}"
+      
+      # Hybrid mode settings
+      HYBRID_ENABLED: "true"
+      PREFER_API: "true"
+      FALLBACK_TO_LOCAL: "true"
+      
+      # Features
+      ENABLE_NER: "true"
+      
+      # File handling
+      MAX_FILE_SIZE: 524288000  # 500MB
+      
+      # Audit
+      AUDIT_LOGGING_ENABLED: "true"
+      AUDIT_TIMEZONE: "Asia/Kolkata"
+    volumes:
+      # Mount logs for easy access
+      - ../logs/dev:/app/logs
+    # Wait for API Gateway to be healthy before starting
+    depends_on:
+      pi-gateway-dev:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    labels:
+      - "environment=development"
+      - "service=pi-web-service"
+      - "version=${VERSION:-dev}"
+    networks:
+      - pi-dev-network
+
+networks:
+  pi-dev-network:
+    driver: bridge
+    name: pi-dev-network

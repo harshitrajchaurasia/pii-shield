@@ -1,0 +1,91 @@
+# PI Remover API Service Configuration
+# =====================================
+# Configuration file for the PI Remover API gateway service.
+# This file uses YAML format and is loaded at service startup.
+#
+# Usage:
+#   python app.py --config config/api_service.yaml
+#   python app.py --port 8080 --environment production
+#
+# Override any setting with command-line arguments:
+#   --port, --host, --environment
+
+# Service Configuration
+service:
+  name: pi-remover-api
+  host: 0.0.0.0
+  port: 8080
+  environment: development  # development | production
+  
+  # API prefix based on environment (/dev/v1 or /prod/v1)
+  api_prefix_dev: /dev
+  api_prefix_prod: /prod
+
+# Logging Configuration
+logging:
+  level: INFO  # DEBUG | INFO | WARNING | ERROR
+  json_format: false  # true for production (ELK/Splunk), false for console
+  file: logs/api_service.log  # Set to null to disable file logging
+  audit_file: logs/audit.log
+  audit_timezone: Asia/Kolkata
+
+# Security Configuration
+security:
+  # JWT Authentication (always enabled)
+  jwt_algorithm: HS256
+  jwt_expiry_minutes: 30
+  
+  # Rate Limiting
+  rate_limit_enabled: true
+  rate_limit_requests: 100  # requests per window
+  rate_limit_window_seconds: 60
+  rate_limit_burst: 20  # burst allowance
+  
+  # Request Size Limits
+  max_text_length: 100000  # 100KB
+  max_batch_size: 100
+  max_request_size: 10485760  # 10MB
+  max_file_size: 524288000  # 500MB
+  
+  # CORS Configuration
+  cors_origins:
+    - "*"  # Restrict in production
+  cors_allow_credentials: true
+  
+  # IP Security (optional)
+  # ip_blocklist: []
+  # ip_allowlist: []
+
+# NER (Named Entity Recognition) Configuration
+ner:
+  enabled: true  # Set to false for fast mode only
+  default_model: en_core_web_lg
+  allowed_models:
+    - en_core_web_sm   # ~12MB, fastest, lower accuracy
+    - en_core_web_md   # ~40MB, balanced
+    - en_core_web_lg   # ~560MB, best balance (recommended)
+    - en_core_web_trf  # ~400MB, highest accuracy, slowest
+
+# Redis Configuration (optional - for distributed rate limiting)
+redis:
+  enabled: false  # Set to true to enable Redis
+  host: localhost
+  port: 6379
+  db: 0
+  password: null  # Set in clients.yaml for security
+  ssl: false
+  # Connection pool settings
+  pool_size: 10
+  socket_timeout: 5
+
+# Metrics Configuration
+metrics:
+  enabled: true
+  # Prometheus endpoint (if using)
+  # prometheus_port: 9090
+
+# Documentation
+docs:
+  # Swagger/ReDoc available only in development
+  swagger_enabled: true  # Auto-disabled in production
+  redoc_enabled: true    # Auto-disabled in production

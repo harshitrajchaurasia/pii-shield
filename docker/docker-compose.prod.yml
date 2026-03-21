@@ -1,0 +1,172 @@
+# PI Remover - PRODUCTION Environment
+# =====================================
+# Strict security, minimal logging, hardened configuration.
+#
+# ⚠️  IMPORTANT: 
+#     - Copy .env.prod.template to .env.prod and configure secrets!
+#     - These ENV vars override config/clients.yaml
+#     - Generate unique production secrets before deployment!
+#       python -c "import secrets; print(secrets.token_urlsafe(32))"
+#
+# Usage:
+#   cd docker
+#   docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Or from project root:
+#   docker-compose -f docker/docker-compose.prod.yml --env-file docker/.env.prod up -d
+#
+# Access:
+#   API Gateway:  http://localhost:9080
+#   Web Service:  http://localhost:9082
+
+version: '3.8'
+
+services:
+  # =========================================================================
+  # PRODUCTION API Gateway
+  # =========================================================================
+  pi-gateway-prod:
+    build:
+      context: ..
+      dockerfile: api_service/Dockerfile
+    container_name: pi-gateway-prod
+    ports:
+      - "9080:8080"
+    environment:
+      # Environment identification
+      ENVIRONMENT: production
+      
+      # Logging - minimal for performance
+      LOG_LEVEL: WARNING
+      
+      # Authentication - HARDCODED for prod
+      # Format: "client_id:client_secret:description,..."
+      # Includes: production client + web service (for service-to-service auth)
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-generate-a-secret-with-python-secrets-token_urlsafe-32}"
+      JWT_EXPIRY_MINUTES: 30
+      AUTH_CLIENTS: "${AUTH_CLIENTS:-pi-prod-client:change-me-prod-secret:production,pi-prod-web-service:change-me-web-secret:web-service}"
+      
+      # Rate limiting - strict
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: 100
+      RATE_LIMIT_WINDOW_SECONDS: 60
+      
+      # Features
+      ENABLE_NER: "true"
+      ENABLE_METRICS: "true"
+      ENABLE_DEBUG_ENDPOINTS: "false"
+      
+      # CORS - restricted to allowed origins
+      CORS_ORIGINS: ${PROD_CORS_ORIGINS:-https://your-domain.com}
+      
+      # Request limits - production values
+      MAX_TEXT_LENGTH: 50000
+      MAX_BATCH_SIZE: 50
+      
+      # Audit
+      AUDIT_LOGGING_ENABLED: "true"
+      AUDIT_TIMEZONE: "Asia/Kolkata"
+    volumes:
+      # Mount logs to persistent volume
+      - pi-prod-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    labels:
+      - "environment=production"
+      - "service=pi-gateway"
+      - "version=${VERSION:-latest}"
+    networks:
+      - pi-prod-network
+
+  # =========================================================================
+  # PRODUCTION Web Service (Hybrid Mode: API + Local Fallback)
+  # =========================================================================
+  pi-web-prod:
+    build:
+      context: ..
+      dockerfile: web_service/Dockerfile
+    container_name: pi-web-prod
+    ports:
+      - "9082:8080"
+    environment:
+      # Environment identification
+      ENVIRONMENT: production
+      
+      # Logging - minimal for performance
+      LOG_LEVEL: WARNING
+      
+      # =====================================================================
+      # HYBRID MODE: API Service Integration with Local Fallback
+      # =====================================================================
+      # API service URL (internal Docker network)
+      API_URL: http://pi-gateway-prod:8080
+      
+      # Service-to-service authentication credentials
+      # Web service authenticates to API service using these credentials
+      WEB_CLIENT_ID: pi-prod-web-service
+      WEB_CLIENT_SECRET: "${WEB_CLIENT_SECRET:-change-me-web-secret}"
+      
+      # Hybrid mode settings
+      HYBRID_ENABLED: "true"
+      PREFER_API: "true"
+      FALLBACK_TO_LOCAL: "true"
+      
+      # Features
+      ENABLE_NER: "true"
+      
+      # File handling - production limits
+      MAX_FILE_SIZE: 104857600  # 100MB
+      
+      # Audit
+      AUDIT_LOGGING_ENABLED: "true"
+      AUDIT_TIMEZONE: "Asia/Kolkata"
+    volumes:
+      # Mount logs to persistent volume
+      - pi-prod-logs:/app/logs
+    # Wait for API Gateway to be healthy before starting
+    depends_on:
+      pi-gateway-prod:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    labels:
+      - "environment=production"
+      - "service=pi-web-service"
+      - "version=${VERSION:-latest}"
+    networks:
+      - pi-prod-network
+
+networks:
+  pi-prod-network:
+    driver: bridge
+    name: pi-prod-network
+
+volumes:
+  pi-prod-logs:
+    name: pi-prod-logs

@@ -1,0 +1,38 @@
+# PI Remover Web Service - Docker Compose
+# For local development and testing
+
+version: '3.8'
+
+services:
+  pi-web-service:
+    build:
+      context: ..
+      dockerfile: web_service/Dockerfile
+    container_name: pi-web-service
+    ports:
+      - "8082:8080"
+    environment:
+      - LOG_LEVEL=INFO
+      - UPLOAD_DIR=/tmp/uploads
+      - MAX_FILE_SIZE=524288000  # 500MB
+    volumes:
+      # Mount temp directory for uploads (optional)
+      - uploads:/tmp/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G  # More memory for NER model
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+volumes:
+  uploads:

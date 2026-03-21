@@ -1,0 +1,50 @@
+{
+  "_description": "PI Remover - Extended Names Dictionary (JSON format)",
+  "_usage": "Place this file in the data/ folder or specify path via load_external_names()",
+  "_version": "2.5.0",
+  
+  "first_names": [
+    "aadhya", "aarohi", "aditi", "anvi", "avni", "bhavya", "charvi", "darshini",
+    "esha", "gauri", "ishani", "kavya", "keerthi", "lavanya", "mansi", "navya",
+    "oviya", "parthiv", "pranathi", "rithika", "saanvi", "shravya", "swara",
+    "tanvi", "trisha", "vedika", "vihaan",
+    "alejandro", "alexandra", "alfonso", "andreas", "benjamin", "caroline",
+    "charlotte", "christian", "claudia", "danielle", "dominic", "elena",
+    "emilia", "fabio", "francisco", "gabriel", "giulia", "giovanni", "helena",
+    "hendrik", "isabel", "johannes", "jonathan", "juliana", "katherine",
+    "laurent", "leonardo", "lorenzo", "luca", "lucia", "manuel", "marco",
+    "maria", "mariana", "matthias", "maximiliano", "nadia", "natalia",
+    "nicolas", "oliver", "patricia", "philippe", "rafael", "renato", "roberto",
+    "rodrigo", "sebastian", "silvia", "stefano", "stephan", "svetlana",
+    "tatiana", "theresa", "tobias", "valentina", "valeria", "vicente",
+    "victoria", "vincenzo", "xavier", "yolanda", "zachary",
+    "ahmed", "ali", "amir", "ayesha", "bilal", "fatima", "hamza", "hassan",
+    "hussain", "ibrahim", "imran", "kareem", "khalid", "layla", "mariam",
+    "mohammad", "mustafa", "omar", "rania", "rashid", "riya", "salma",
+    "samir", "sana", "tariq", "yasmeen", "yusuf", "zainab",
+    "akira", "chen", "cheng", "daiki", "haruki", "hiroshi", "huang", "kenji",
+    "kumar", "li", "ming", "naoki", "takeshi", "tanaka", "wang", "wei",
+    "yamamoto", "yang", "yuki", "zhang"
+  ],
+  
+  "last_names": [
+    "acharya", "adhikari", "agnihotri", "bajpai", "bakshi", "bhandari",
+    "bhargava", "bhogal", "chaturvedi", "dalal", "daruwalla", "dhingra",
+    "dubey", "dwivedi", "gaikwad", "gaur", "hazra", "jadhav", "jaiswal",
+    "johar", "kak", "kalra", "khatri", "lahiri", "manchanda", "mani",
+    "nagpal", "nayar", "ojha", "panicker", "parmar", "phukan", "pradhan",
+    "raghavan", "raina", "ranganathan", "sabharwal", "sachdev", "sadana",
+    "sahoo", "sandhu", "sarma", "seshadri", "shenoy", "shrivastava", "sidhu",
+    "sikka", "soman", "sood", "srinivas", "sukumar", "sundaresan", "taneja",
+    "thakkar", "thapar", "thimmaiah", "uppal", "vaidya", "vohra", "walia"
+  ],
+  
+  "excluded_words": [
+    "update", "service", "support", "system", "admin", "manager", "engineer",
+    "developer", "analyst", "consultant", "director", "lead", "senior",
+    "junior", "team", "group", "department", "division", "unit", "center",
+    "office", "branch", "region", "zone", "area", "network", "server",
+    "database", "application", "software", "hardware", "security", "access",
+    "login", "password", "username", "account", "profile", "settings"
+  ]
+}

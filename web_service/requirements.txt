@@ -1,0 +1,40 @@
+# PI Remover Web Service - Dependencies (Microservices Architecture)
+# ===================================================================
+# The web service calls the API service for all redaction operations.
+# It does NOT need spaCy or heavy NLP libraries.
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Templates
+jinja2>=3.1.0
+python-multipart>=0.0.6
+
+# Data validation
+pydantic>=2.0.0
+
+# HTTP Client (for calling API service)
+httpx>=0.25.0
+
+# Configuration
+pyyaml>=6.0.0
+
+# Data processing (for file handling)
+pandas>=1.5.0
+openpyxl>=3.0.0  # Excel support
+
+# Document processing (optional - for file type detection)
+python-docx>=0.8.11      # DOCX support
+python-pptx>=0.6.21      # PPTX support
+pdfplumber>=0.9.0        # PDF support
+beautifulsoup4>=4.12.0   # HTML/XML support
+lxml>=4.9.0              # HTML/XML parser
+
+# Redis (optional - for distributed rate limiting)
+# Uncomment if using Redis for rate limiting across instances
+# redis>=5.0.0
+
+# Note: spaCy is NOT required in web service
+# All NER processing is done by the API service
+
