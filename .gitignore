@@ -48,7 +48,7 @@ Thumbs.db
 # Docker volumes
 docker/volumes/
 
-# AI tooling
+# AI tooling / generated docs
 CLAUDE.md
 .claude/
-docs/learning/
+docs/
