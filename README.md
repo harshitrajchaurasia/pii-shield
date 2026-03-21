@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![PII Types](https://img.shields.io/badge/PII_types-35+-orange)
-<!-- ![Live Demo](https://img.shields.io/badge/demo-live-brightgreen?logo=render) -->
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen?logo=googlecloud)](https://pii-shield-49982461185.us-central1.run.app)
 
 **Stop leaking personal data to LLMs.**
 
@@ -20,7 +20,7 @@ When you ask ChatGPT to "review my resume" or "draft a complaint letter," your n
                                       PII Shield
 ```
 
-<!-- > **[Live Demo](https://pii-shield.onrender.com)** — try it in your browser (first load may take ~30s) -->
+> **[Live Demo](https://pii-shield-49982461185.us-central1.run.app)** — try it in your browser
 
 ## Why PII Shield?
 
