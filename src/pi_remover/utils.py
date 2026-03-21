@@ -26,7 +26,7 @@ import platform
 import re
 import sys
 import unicodedata
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 
