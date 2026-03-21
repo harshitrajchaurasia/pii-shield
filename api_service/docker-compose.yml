@@ -1,0 +1,35 @@
+# PI Remover API - Docker Compose
+# For local development and testing
+
+version: '3.8'
+
+services:
+  pi-gateway:
+    build:
+      context: ..
+      dockerfile: api_service/Dockerfile
+    container_name: pi-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - LOG_LEVEL=INFO
+      - MAX_TEXT_LENGTH=100000
+      - MAX_BATCH_SIZE=100
+      - ENABLE_METRICS=true
+      - ENABLE_NER=true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    # Resource limits - increased for spaCy NER
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M

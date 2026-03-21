@@ -1,0 +1,132 @@
+# =============================================================================
+# PI Remover Auto-Scaling Configuration
+# =============================================================================
+# 
+# This configuration controls multi-level auto-scaling:
+# - Level 1: File-based worker scaling (automatic, based on file size)
+# - Level 2: Runtime resource-aware scaling (CPU/Memory monitoring)
+# - Level 3: Queue-based service scaling (for API service)
+# - Level 4: Cloud cost-aware scaling (budget and scheduling)
+#
+# Environment: Development / Production
+# Version: 1.0.0
+# =============================================================================
+
+# General settings
+enabled: true
+strategy: balanced  # conservative, balanced, aggressive
+
+# Worker limits
+min_workers: 1
+max_workers: 8  # Adjust based on your machine
+
+# Scaling thresholds
+scale_up_threshold: 10    # Queue depth to trigger scale up
+scale_down_threshold: 2   # Queue depth to trigger scale down
+cooldown_seconds: 60      # Wait between scaling actions
+
+# =============================================================================
+# Level 2: Resource Monitoring
+# =============================================================================
+enable_resource_monitoring: true
+cpu_scale_down_threshold: 85.0    # Scale down if CPU > this
+memory_scale_down_threshold: 80.0  # Scale down if memory > this
+
+# =============================================================================
+# Level 3: Queue-Based Scaling
+# =============================================================================
+enable_queue_scaling: true
+queue_check_interval: 10  # seconds
+
+# Priority queue thresholds
+urgent_queue_threshold: 5   # Scale up immediately if urgent > this
+normal_queue_threshold: 20  # Scale up if normal > this
+batch_queue_threshold: 50   # Scale up if batch > this
+
+# =============================================================================
+# Level 4: Cloud Configuration
+# =============================================================================
+cloud:
+  # Provider: gcp, aws, azure, local
+  provider: local
+  
+  # GCP specific (if using Google Cloud)
+  # project_id: your-gcp-project
+  # region: us-central1
+  
+  # Instance limits
+  min_instances: 1
+  max_instances: 10
+  target_cpu_utilization: 70.0
+  
+  # Cost controls (USD)
+  monthly_budget: 500.0
+  alert_threshold: 80.0   # Alert at 80% of budget
+  stop_threshold: 100.0   # Stop scaling at 100% of budget
+  
+  # Scheduling (time-based scaling)
+  enable_scheduling: false
+  peak_hours_start: "09:00"
+  peak_hours_end: "18:00"
+  peak_max_instances: 10
+  off_peak_max_instances: 2
+  timezone: "Asia/Kolkata"
+
+# =============================================================================
+# File-Based Scaling Profiles (Level 1)
+# =============================================================================
+# These are automatically applied based on file size.
+# You can customize thresholds here.
+
+file_scaling:
+  # Thresholds (row counts)
+  small_file_threshold: 1000
+  medium_file_threshold: 10000
+  large_file_threshold: 50000
+  xlarge_file_threshold: 100000
+  
+  # Chunk sizes for each tier
+  small_chunk_size: 500
+  medium_chunk_size: 1000
+  large_chunk_size: 2000
+  xlarge_chunk_size: 5000
+  
+  # Worker ratios (multiplier of cpu_count)
+  small_workers_ratio: 0      # Single-threaded
+  medium_workers_ratio: 0.5   # Half CPUs
+  large_workers_ratio: 0.75   # 3/4 CPUs
+  xlarge_workers_ratio: 1.0   # All CPUs
+
+# =============================================================================
+# Logging & Monitoring
+# =============================================================================
+logging:
+  level: INFO
+  log_scaling_decisions: true
+  log_metrics: true
+
+# Metrics export (optional)
+metrics:
+  enabled: false
+  export_interval: 60  # seconds
+  # prometheus_endpoint: http://localhost:9090/metrics
+  # cloudwatch_namespace: PIRemover
+
+# =============================================================================
+# Environment-Specific Overrides
+# =============================================================================
+# These can be overridden by environment variables:
+#
+# AUTOSCALER_ENABLED=true
+# AUTOSCALER_MIN_WORKERS=1
+# AUTOSCALER_MAX_WORKERS=8
+# AUTOSCALER_STRATEGY=balanced
+# AUTOSCALER_COOLDOWN_SECONDS=60
+# AUTOSCALER_SCALE_UP_THRESHOLD=10
+# AUTOSCALER_SCALE_DOWN_THRESHOLD=2
+# AUTOSCALER_MONTHLY_BUDGET=500
+#
+# Cloud provider detection:
+# GOOGLE_CLOUD_PROJECT=your-project  (GCP)
+# AWS_REGION=us-east-1               (AWS)
+# AZURE_FUNCTIONS_ENVIRONMENT=...    (Azure)

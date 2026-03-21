@@ -1,0 +1,118 @@
+# PI Remover Web Service Configuration
+# =====================================
+# Configuration file for the PI Remover Web UI service.
+# This file uses YAML format and is loaded at service startup.
+#
+# In the microservices architecture, the web service calls the API service
+# for all PI redaction operations rather than doing them directly.
+#
+# Usage:
+#   python app.py --config config/web_service.yaml
+#   python app.py --port 8082 --environment production
+
+# Service Configuration
+service:
+  name: pi-remover-web
+  host: 0.0.0.0
+  port: 8082
+  environment: development  # development | production
+
+# Logging Configuration
+logging:
+  level: INFO  # DEBUG | INFO | WARNING | ERROR
+  json_format: false  # true for production (ELK/Splunk)
+  file: logs/web_service.log
+  audit_file: logs/audit.log
+  audit_timezone: Asia/Kolkata
+
+# API Client Configuration
+# The web service calls the API service via HTTP for redaction operations
+api_client:
+  # API service URL (internal network in production)
+  base_url: http://localhost:8080
+  
+  # Request timeout
+  timeout_seconds: 30
+  connect_timeout_seconds: 5
+  
+  # Retry configuration
+  max_retries: 3
+  retry_delay_seconds: 1
+  retry_max_delay_seconds: 10
+  retry_exponential_base: 2
+  
+  # Connection pooling
+  max_connections: 100
+  max_keepalive_connections: 20
+  keepalive_expiry_seconds: 30
+  
+  # Circuit breaker (resilience)
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5  # failures before opening circuit
+    recovery_timeout_seconds: 30  # time before trying again
+    half_open_max_calls: 3  # calls allowed in half-open state
+  
+  # Service-to-service authentication
+  # Client credentials loaded from clients.yaml
+  client_id: pi-internal-web-service
+
+# File Upload Configuration
+upload:
+  max_file_size: 524288000  # 500MB
+  allowed_extensions:
+    - .csv
+    - .xlsx
+    - .xls
+    - .json
+    - .txt
+    - .docx
+    - .doc
+    - .pptx
+    - .ppt
+    - .pdf
+    - .html
+    - .htm
+    - .xml
+    - .md
+    - .log
+    - .rtf
+  
+  # Temporary upload directory
+  upload_dir: null  # null = system temp directory
+  
+  # Auto-cleanup of processed files
+  cleanup_after_hours: 24
+
+# Security Configuration
+security:
+  # CORS Configuration
+  cors_origins:
+    - "*"  # Restrict in production
+  cors_allow_credentials: true
+  
+  # Rate limiting (uses Redis if available, else in-memory)
+  rate_limit_enabled: true
+  
+  # Security headers
+  security_headers_enabled: true
+
+# Redis Configuration (optional - for session/rate limiting)
+redis:
+  enabled: false
+  host: localhost
+  port: 6379
+  db: 1  # Different DB than API service
+  password: null
+
+# Session Configuration (for future use)
+session:
+  enabled: false
+  secret_key: null  # Auto-generated if not set
+  expire_minutes: 60
+
+# Health Check
+health:
+  # Check API service availability
+  check_api_service: true
+  api_check_interval_seconds: 30

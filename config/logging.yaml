@@ -1,0 +1,134 @@
+# Centralized Logging Configuration
+# ==================================
+# Configuration for structured logging compatible with ELK Stack, Splunk,
+# and other log aggregation systems.
+#
+# Both services use the same logging format for consistent log analysis.
+
+# General Settings
+general:
+  # Default log level (can be overridden per service)
+  level: INFO  # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  
+  # Timezone for timestamps
+  timezone: Asia/Kolkata
+  
+  # Date format for human-readable logs
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+# Console Output
+console:
+  enabled: true
+  
+  # Use JSON format in console (true for containers, false for local dev)
+  json_format: false
+  
+  # Colorized output (only works when json_format is false)
+  colorize: true
+  
+  # Log level for console (can be different from file)
+  level: INFO
+
+# File Output
+file:
+  enabled: true
+  
+  # Always use JSON for file logs (for log aggregation)
+  json_format: true
+  
+  # File rotation settings
+  rotation:
+    max_bytes: 10485760  # 10MB
+    backup_count: 5
+    
+  # Log file paths (relative to service directory)
+  paths:
+    api_service: logs/api_service.log
+    web_service: logs/web_service.log
+    audit: logs/audit.log
+    security: logs/security.log
+
+# Audit Logging
+audit:
+  enabled: true
+  
+  # Retention period for audit logs (days)
+  retention_days: 90
+  
+  # Events to audit
+  events:
+    - auth_success
+    - auth_failure
+    - token_issued
+    - token_expired
+    - rate_limit_exceeded
+    - file_upload
+    - file_download
+    - redaction_request
+    - security_event
+
+# Structured Log Fields
+# These fields are automatically added to all log entries
+fields:
+  # Service identification
+  service_name: true
+  service_version: true
+  
+  # Request tracking
+  correlation_id: true
+  request_id: true
+  
+  # Client information
+  client_ip: true
+  client_id: true
+  user_agent: false  # Disabled by default (verbose)
+  
+  # Performance
+  duration_ms: true
+  
+  # Error details
+  exception_type: true
+  stack_trace: true  # Only for ERROR and above
+
+# PI Protection in Logs
+# Prevent accidental PI leakage in log messages
+pi_protection:
+  enabled: true
+  
+  # Patterns to mask
+  patterns:
+    email: true
+    phone: true
+    ssn: true
+    credit_card: true
+    ip_address: true
+  
+  # Replacement tokens
+  replacements:
+    email: "[EMAIL]"
+    phone: "[PHONE]"
+    ssn: "[SSN]"
+    credit_card: "[CARD]"
+    ip_address: "[IP]"
+
+# Log Forwarding (future feature)
+forwarding:
+  # ELK Stack
+  elasticsearch:
+    enabled: false
+    hosts:
+      - http://elasticsearch:9200
+    index_prefix: pi-remover
+    
+  # Splunk
+  splunk:
+    enabled: false
+    hec_url: https://splunk:8088/services/collector
+    hec_token: null  # Set in secrets
+    index: pi-remover
+    
+  # Cloud Logging
+  gcp_logging:
+    enabled: false
+    project_id: null
+    log_name: pi-remover

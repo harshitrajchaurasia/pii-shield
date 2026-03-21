@@ -1,0 +1,152 @@
+# PI Remover - Docker Compose Configuration (Microservices Architecture)
+# ========================================================================
+# This is the base configuration file. Use with environment-specific overlays:
+#
+#   Development:
+#     docker-compose -f docker-compose.base.yml -f docker-compose.dev.yml up -d
+#
+#   Production:
+#     docker-compose -f docker-compose.base.yml -f docker-compose.prod.yml up -d
+#
+# Architecture (v2.9.0):
+#   - API Service (pi-gateway): Core redaction API on port 8080
+#   - Web Service (pi-web): Web UI calling API service on port 8082
+#   - Redis: Shared rate limiting and caching (optional)
+#
+# Version: 2.9.0
+
+version: '3.8'
+
+# =============================================================================
+# SHARED CONFIGURATION
+# =============================================================================
+
+# Common healthcheck settings
+x-healthcheck: &healthcheck
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 15s
+
+# Common resource limits
+x-resource-limits: &resource-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        cpus: '0.5'
+        memory: 512M
+
+# Common restart policy
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+
+networks:
+  # Internal network for service-to-service communication
+  pi-internal:
+    driver: bridge
+  
+  # External network for client access
+  pi-external:
+    driver: bridge
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  # Shared configuration volume
+  config-volume:
+    driver: local
+  
+  # Redis data persistence
+  redis-data:
+    driver: local
+  
+  # Log aggregation volume
+  logs-volume:
+    driver: local
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+
+services:
+  
+  # ---------------------------------------------------------------------------
+  # REDIS - Shared Rate Limiting & Caching
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: pi-redis
+    networks:
+      - pi-internal
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      <<: *healthcheck
+    <<: *restart-policy
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+  
+  # ---------------------------------------------------------------------------
+  # API SERVICE (PI Gateway)
+  # ---------------------------------------------------------------------------
+  pi-gateway:
+    build:
+      context: ..
+      dockerfile: api_service/Dockerfile
+    container_name: pi-gateway
+    networks:
+      - pi-internal
+      - pi-external
+    volumes:
+      # Mount configuration files (YAML configs, not env vars)
+      - ../config:/app/config:ro
+      # Mount logs
+      - logs-volume:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/docs')"]
+      <<: *healthcheck
+    <<: *restart-policy
+    <<: *resource-limits
+  
+  # ---------------------------------------------------------------------------
+  # WEB SERVICE (Web UI) - Calls API Service via HTTP
+  # ---------------------------------------------------------------------------
+  pi-web:
+    build:
+      context: ..
+      dockerfile: web_service/Dockerfile
+    container_name: pi-web
+    networks:
+      - pi-internal
+      - pi-external
+    volumes:
+      # Mount configuration files (YAML configs)
+      - ../config:/app/config:ro
+      # Mount logs
+      - logs-volume:/app/logs
+    depends_on:
+      pi-gateway:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
+      <<: *healthcheck
+    <<: *restart-policy
+    <<: *resource-limits

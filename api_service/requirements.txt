@@ -1,0 +1,40 @@
+# PI Remover API Service - Dependencies (Microservices Architecture)
+# ===================================================================
+# The API service handles all PI redaction with NER support.
+# This is the core service that web_service calls.
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Data validation
+pydantic>=2.0.0
+
+# Configuration
+pyyaml>=6.0.0
+
+# Core dependencies
+pandas>=1.5.0
+tqdm>=4.64.0
+
+# Monitoring & Observability
+prometheus_client>=0.19.0  # Prometheus metrics endpoint
+
+# Document processing (optional - for file upload support)
+python-docx>=0.8.11      # DOCX support
+python-pptx>=0.6.21      # PPTX support
+pdfplumber>=0.9.0        # PDF support
+beautifulsoup4>=4.12.0   # HTML/XML support
+
+# Redis (optional - for distributed rate limiting)
+# Uncomment if using Redis for rate limiting across instances
+# redis>=5.0.0
+
+# spaCy for NER (optional - for full mode)
+# Uncomment to enable NER-based name detection
+# spacy>=3.7.0
+
+# Default spaCy model (large English model - best balance)
+# Install with: python -m spacy download en_core_web_lg
+# Or for Docker, add this to requirements:
+# https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.7.1/en_core_web_lg-3.7.1-py3-none-any.whl

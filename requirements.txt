@@ -1,0 +1,48 @@
+# PI Removal Tool - Dependencies
+# ================================
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+pandas>=1.5.0
+tqdm>=4.64.0
+
+# NLP / Named Entity Recognition
+spacy>=3.5.0
+# spaCy transformer model - install automatically via pip
+https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.7.3/en_core_web_trf-3.7.3-py3-none-any.whl
+
+# Excel file support
+openpyxl>=3.0.0
+xlrd>=2.0.0
+
+# Document processing (optional - install if processing these file types)
+python-docx>=0.8.11      # DOCX/DOC support
+python-pptx>=0.6.21      # PPTX/PPT support
+pdfplumber>=0.9.0        # PDF text extraction
+beautifulsoup4>=4.12.0   # HTML/XML parsing
+lxml>=4.9.0              # Fast HTML/XML parser for BeautifulSoup
+
+# Configuration
+pyyaml>=6.0
+
+# Optional: For better performance with large files
+pyarrow>=10.0.0
+
+# System monitoring for auto-scaling (optional but recommended)
+psutil>=5.9.0
+
+# Async Redis for distributed queue (optional)
+redis>=5.0.0
+
+# Timezone handling for scheduling (optional)
+pytz>=2023.3
+
+# =================================
+# Post-installation steps:
+# =================================
+# Download spaCy English transformer model (recommended, most accurate):
+#   python -m spacy download en_core_web_trf
+#
+# Or use smaller/faster models:
+#   python -m spacy download en_core_web_lg  # Large model, good accuracy
+#   python -m spacy download en_core_web_sm  # Small model, fastest

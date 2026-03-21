@@ -1,0 +1,91 @@
+# Redis Configuration for PI Remover
+# ===================================
+# Optional Redis configuration for distributed rate limiting,
+# caching, and session management across service instances.
+#
+# Redis is OPTIONAL - services fall back to in-memory storage if unavailable.
+
+# Connection Settings
+connection:
+  host: localhost
+  port: 6379
+  db: 0
+  password: null  # Set if Redis AUTH enabled
+  
+  # TLS/SSL Configuration
+  ssl: false
+  ssl_cert_path: null
+  ssl_key_path: null
+  ssl_ca_path: null
+
+# Connection Pool Settings
+pool:
+  max_connections: 20
+  min_idle_connections: 5
+  socket_timeout: 5
+  socket_connect_timeout: 5
+  
+  # Health check interval
+  health_check_interval: 30
+  
+  # Retry settings for connection failures
+  retry_on_timeout: true
+  max_retries: 3
+
+# Rate Limiting Configuration
+rate_limiting:
+  # Key prefix for rate limit entries
+  key_prefix: pi_remover:ratelimit
+  
+  # Default TTL for rate limit windows (seconds)
+  window_ttl: 60
+  
+  # Use sliding window algorithm
+  sliding_window: true
+
+# Caching Configuration
+cache:
+  # Key prefix for cache entries
+  key_prefix: pi_remover:cache
+  
+  # Default TTL for cached items (seconds)
+  default_ttl: 300
+  
+  # Maximum cache size (entries) - 0 for unlimited
+  max_entries: 10000
+
+# Session Configuration (for web service)
+session:
+  # Key prefix for session entries
+  key_prefix: pi_remover:session
+  
+  # Session TTL (seconds)
+  ttl: 3600
+
+# Pub/Sub Configuration (for future use)
+pubsub:
+  # Channel prefix
+  channel_prefix: pi_remover:events
+
+# Sentinel Configuration (for high availability)
+sentinel:
+  enabled: false
+  master_name: mymaster
+  sentinels:
+    - host: sentinel1
+      port: 26379
+    - host: sentinel2
+      port: 26379
+    - host: sentinel3
+      port: 26379
+
+# Cluster Configuration (for horizontal scaling)
+cluster:
+  enabled: false
+  startup_nodes:
+    - host: redis-node1
+      port: 6379
+    - host: redis-node2
+      port: 6379
+    - host: redis-node3
+      port: 6379
