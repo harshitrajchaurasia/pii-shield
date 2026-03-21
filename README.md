@@ -1,31 +1,42 @@
 # PII Shield
 
+![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+![PII Types](https://img.shields.io/badge/PII_types-35+-orange)
+<!-- ![Live Demo](https://img.shields.io/badge/demo-live-brightgreen?logo=render) -->
+
 **Stop leaking personal data to LLMs.**
 
-PII Shield is a middleware that sits between your prompts and the LLM, automatically detecting and replacing 35+ types of personal information with safe placeholder tokens — so the LLM still understands the context, but never sees the real data.
+When you ask ChatGPT to "review my resume" or "draft a complaint letter," your name, phone number, Aadhaar, PAN, and other personal details get sent to external servers. PII Shield sits between you and the AI — it detects and replaces personal information with safe tokens, so the AI still understands your request without ever seeing your real data.
 
 ```
- Your Prompt                        Safe Prompt                         LLM
- ┌─────────────────────┐     ┌─────────────────────────┐     ┌──────────────────┐
- │ "Help me draft an   │     │ "Help me draft an       │     │                  │
- │  email to John at   │ ──> │  email to [NAME] at     │ ──> │  ChatGPT/Claude  │
- │  john@acme.com,     │     │  [EMAIL], employee      │     │  processes safely │
- │  employee #EMP-4523"│     │  #[EMP_ID]"             │     │                  │
- └─────────────────────┘     └─────────────────────────┘     └──────────────────┘
-                                    PII Shield
+ Your Prompt                          Safe Prompt                        AI Response
+ ┌──────────────────────┐     ┌────────────────────────────┐     ┌──────────────────┐
+ │ "Draft a complaint   │     │ "Draft a complaint         │     │                  │
+ │  for Rajesh Kumar,   │ ──> │  for [NAME],               │ ──> │  ChatGPT/Claude  │
+ │  rajesh@gmail.com,   │     │  [EMAIL],                  │     │  responds safely │
+ │  Aadhaar 1234 5678"  │     │  Aadhaar [AADHAAR]"        │     │                  │
+ └──────────────────────┘     └────────────────────────────┘     └──────────────────┘
+                                      PII Shield
 ```
 
-<!-- > **[Live Demo](https://pii-shield.onrender.com)** — try it in your browser (first load may take ~30s on free tier) -->
+<!-- > **[Live Demo](https://pii-shield.onrender.com)** — try it in your browser (first load may take ~30s) -->
+
+## Why PII Shield?
+
+- You paste a prompt containing your **name, email, phone, Aadhaar, PAN, credit card number**
+- That data travels to OpenAI/Google/Anthropic servers
+- It may be logged, cached, or used for training
+- **PII Shield strips it out first** — the AI gets `[NAME]`, `[EMAIL]`, `[AADHAAR]` instead
 
 ## Features
 
-- **35+ PII types detected** — names, emails, phones, Aadhaar, PAN, employee IDs, IPs, hostnames, credentials, cloud IDs, and more
-- **Fast mode** — regex + dictionary detection at ~1,500 rows/sec (no ML model needed)
-- **Full mode** — adds spaCy NER for highest accuracy (~150 rows/sec)
-- **Web UI** — paste text or upload files (CSV, Excel, JSON, DOCX, PDF, HTML)
-- **REST API** — JWT-authenticated endpoints for programmatic access
-- **Dark/light theme** — modern responsive interface
-- **Zero data retention** — nothing is stored or logged
+- **35+ PII types** — names, emails, phones, Aadhaar, PAN, SSN, passport, credit cards, DOB, bank accounts, UPI, and more
+- **Web UI** — paste text or drag-and-drop files (CSV, Excel, JSON, DOCX, PDF)
+- **Instant results** — regex + dictionary detection, no external API calls
+- **Dark/light theme** — clean, modern interface
+- **Zero data retention** — nothing stored, nothing logged, runs locally or self-hosted
+- **Open source** — MIT licensed, free forever
 
 ## Quick Start
 
@@ -40,76 +51,52 @@ Open [http://localhost:8082](http://localhost:8082) in your browser.
 
 ## Example
 
-**Before (your prompt with PII):**
-> Summarize this ticket: User john.smith (John Smith, john.smith@acme.com) reports VPN issues from IP 10.0.1.55. Badge: B-78432. Employee ID: EMP-45231. Incident: INC0012345.
+**Your prompt:**
+> Help me write a complaint letter to my bank. My name is Rajesh Kumar, email rajesh.kumar@gmail.com, phone +91 98765 43210. My Aadhaar is 1234 5678 9012, PAN: ABCDE1234F. Account number 50100123456789.
 
-**After (safe for LLM):**
-> Summarize this ticket: User [AD_USER] ([NAME], [EMAIL]) reports VPN issues from IP [IP_ADDRESS]. Badge: [BADGE_ID]. Employee ID: [EMP_ID]. Incident: [TICKET_NUM].
+**Safe prompt (sent to AI):**
+> Help me write a complaint letter to my bank. My name is [NAME], email [EMAIL], phone [PHONE]. My Aadhaar is [AADHAAR], PAN: [PAN]. Account number [BANK_ACCT].
 
-The LLM understands the structure and context perfectly — but never sees the actual personal information.
+The AI writes the letter perfectly — using placeholders you can swap back in later.
 
 ## PII Types Detected
 
 | Category | Types |
 |----------|-------|
-| **Personal** | Names, Email, Phone, Aadhaar, PAN Card, Credit/Debit Card |
-| **Enterprise** | Employee ID, Asset ID, Ticket Number, Seat/Desk, Badge, Extension |
-| **IT Infrastructure** | IP Address, URL, Hostname, AD Username, Windows SID |
-| **Credentials** | Passwords, API Keys, Session Tokens, DB Connection Strings |
-| **Cloud/Remote** | Azure AD ID, AWS Account ID, Remote Session ID |
+| **Identity** | Names, Email, Phone, Date of Birth, Addresses |
+| **Government IDs** | Aadhaar, PAN, SSN, Passport, Driving License |
+| **Financial** | Credit/Debit Card, Bank Account, UPI, IFSC/SWIFT |
+| **Digital** | IP Address, URL, Usernames, Passwords, API Keys |
 
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Browser   │────>│  Web Service     │────>│  API Service     │
-│   (UI)      │     │  (Port 8082)     │     │  (Port 8080)     │
-└─────────────┘     │  FastAPI + UI    │     │  FastAPI + JWT   │
-                    │                  │     │  Rate Limiting   │
-                    │  Local PIRemover │     │  PIRemover Core  │
-                    │  (fallback)      │     │  + spaCy NER     │
-                    └──────────────────┘     └──────────────────┘
+┌─────────────┐     ┌──────────────────────────────────────┐
+│             │     │         PII Shield Web Service       │
+│   Browser   │────>│                                      │
+│             │     │  FastAPI + Redaction Engine (Local)   │
+│             │<────│  Regex (35+ patterns) + Dictionaries  │
+└─────────────┘     └──────────────────────────────────────┘
 ```
 
-The web service works **standalone** — if the API service is unavailable, it automatically falls back to local processing with a built-in circuit breaker.
-
-## API Usage
-
-```bash
-# Get a token
-TOKEN=$(curl -s -X POST http://localhost:8080/dev/v1/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"client_id":"pi-dev-client","client_secret":"your-secret"}' | jq -r '.access_token')
-
-# Redact text
-curl -X POST http://localhost:8080/dev/v1/redact \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Contact john@acme.com or call 555-867-5309"}'
-```
+All processing happens locally — your data never leaves the server.
 
 ## Python Library
 
 ```python
 from pi_remover import PIRemover, PIRemoverConfig
 
-config = PIRemoverConfig(enable_ner=False)  # Fast mode
-remover = PIRemover(config)
+remover = PIRemover(PIRemoverConfig(enable_ner=False))
 
-result = remover.redact("Email john@acme.com, EMP-45231")
-print(result.redacted_text)  # "Email [EMAIL], [EMP_ID]"
-```
-
-## Running with Docker
-
-```bash
-docker-compose -f docker/docker-compose.dev.yml up -d
+result = remover.redact("Email rajesh@gmail.com, Aadhaar 1234 5678 9012")
+print(result.redacted_text)
+# "Email [EMAIL], Aadhaar [AADHAAR]"
 ```
 
 ## Tech Stack
 
-Python 3.11+ | FastAPI | spaCy NER | Pandas | Pydantic | HTTPX | Docker
+Python 3.11+ | FastAPI | Pandas | Pydantic | spaCy NER (optional)
 
 ## License
 
-MIT
+MIT — free for personal and commercial use.

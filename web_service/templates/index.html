@@ -1036,7 +1036,7 @@
     <main class="main">
         <div class="page-header">
             <h1>LLM Safety Middleware</h1>
-            <p>Strip personal information from your prompts before they reach the LLM. Paste a prompt, get a safe version back.</p>
+            <p>Protect your personal data before sharing prompts with ChatGPT, Claude, Gemini, or any AI.</p>
         </div>
 
         <div class="content-grid">
@@ -1078,12 +1078,12 @@
                         <div id="text-panel" class="tab-panel active">
                             <div class="form-group">
                                 <label class="form-label">Your Prompt</label>
-                                <textarea id="input-text" class="textarea" placeholder="Paste your LLM prompt here...&#10;&#10;Example: Help me draft an email to John Smith (john.smith@acme.com, phone: +1-555-867-5309). His employee ID is EMP-45231 and he connects from 192.168.1.100."></textarea>
+                                <textarea id="input-text" class="textarea" placeholder="Paste your AI prompt here...&#10;&#10;Example: Help me write a complaint letter. My name is Rajesh Kumar, email rajesh.kumar@gmail.com, phone +91 98765 43210. My Aadhaar is 1234 5678 9012."></textarea>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
                                     <span style="font-size: 0.75rem; color: var(--text-secondary); align-self: center;">Try:</span>
-                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(0)">IT Support</button>
-                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(1)">HR Query</button>
-                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(2)">Security Audit</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(0)">Complaint Letter</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(1)">Resume Review</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(2)">Bank Dispute</button>
                                 </div>
                             </div>
 
@@ -1293,56 +1293,41 @@
                     </summary>
                     <div class="pi-types-content">
                         <div class="pi-category">
-                            <div class="pi-category-title">Personal</div>
+                            <div class="pi-category-title">Identity</div>
                             <div class="pi-tags">
+                                <span class="pi-tag" title="Personal names">[NAME]</span>
                                 <span class="pi-tag" title="Email addresses">[EMAIL]</span>
                                 <span class="pi-tag" title="Phone numbers">[PHONE]</span>
-                                <span class="pi-tag" title="Personal names">[NAME]</span>
+                                <span class="pi-tag" title="Date of birth">[DOB]</span>
+                                <span class="pi-tag" title="Physical addresses">[LOCATION]</span>
+                            </div>
+                        </div>
+                        <div class="pi-category">
+                            <div class="pi-category-title">Government IDs</div>
+                            <div class="pi-tags">
                                 <span class="pi-tag" title="Aadhaar numbers">[AADHAAR]</span>
                                 <span class="pi-tag" title="PAN cards">[PAN]</span>
-                                <span class="pi-tag" title="Credit cards">[CARD]</span>
+                                <span class="pi-tag" title="Social Security Numbers">[SSN]</span>
+                                <span class="pi-tag" title="Passport numbers">[PASSPORT]</span>
+                                <span class="pi-tag" title="Driving license">[DL]</span>
                             </div>
                         </div>
                         <div class="pi-category">
-                            <div class="pi-category-title">Enterprise</div>
+                            <div class="pi-category-title">Financial</div>
                             <div class="pi-tags">
-                                <span class="pi-tag" title="Employee IDs">[EMP_ID]</span>
-                                <span class="pi-tag" title="Asset IDs (HW, SW, VD)">[ASSET_ID]</span>
-                                <span class="pi-tag" title="ITSM tickets (INC, RITM, CHG)">[TICKET_NUM]</span>
-                                <span class="pi-tag" title="Desk/Seat locations">[SEAT]</span>
-                                <span class="pi-tag" title="Badge/Access cards">[BADGE]</span>
-                                <span class="pi-tag" title="Phone extensions">[EXTENSION]</span>
+                                <span class="pi-tag" title="Credit/Debit cards">[CARD]</span>
+                                <span class="pi-tag" title="Bank account numbers">[BANK_ACCT]</span>
+                                <span class="pi-tag" title="UPI payment IDs">[UPI]</span>
+                                <span class="pi-tag" title="IFSC/SWIFT codes">[IFSC]</span>
                             </div>
                         </div>
                         <div class="pi-category">
-                            <div class="pi-category-title">IT Infrastructure</div>
+                            <div class="pi-category-title">Digital</div>
                             <div class="pi-tags">
                                 <span class="pi-tag" title="IP addresses">[IP]</span>
                                 <span class="pi-tag" title="URLs">[URL]</span>
-                                <span class="pi-tag" title="Server hostnames">[HOSTNAME]</span>
-                                <span class="pi-tag" title="Active Directory names">[AD_NAME]</span>
-                                <span class="pi-tag" title="AD usernames (domain\user)">[AD_USER]</span>
-                                <span class="pi-tag" title="Windows SIDs">[SID]</span>
-                            </div>
-                        </div>
-                        <div class="pi-category">
-                            <div class="pi-category-title">Security & Credentials</div>
-                            <div class="pi-tags">
-                                <span class="pi-tag" title="Passwords">[CREDENTIAL]</span>
-                                <span class="pi-tag" title="Session/JWT tokens">[SESSION]</span>
-                                <span class="pi-tag" title="BitLocker/Recovery keys">[RECOVERY_KEY]</span>
-                                <span class="pi-tag" title="Software license keys">[LICENSE]</span>
-                                <span class="pi-tag" title="Database connection strings">[DB_CONN]</span>
-                            </div>
-                        </div>
-                        <div class="pi-category">
-                            <div class="pi-category-title">Remote & Cloud</div>
-                            <div class="pi-tags">
-                                <span class="pi-tag" title="TeamViewer/AnyDesk IDs">[REMOTE_ID]</span>
-                                <span class="pi-tag" title="Azure subscription IDs">[AZURE_ID]</span>
-                                <span class="pi-tag" title="AWS account IDs">[AWS_ID]</span>
-                                <span class="pi-tag" title="Chat @mentions">[MENTION]</span>
-                                <span class="pi-tag" title="Audit log usernames">[AUDIT_USER]</span>
+                                <span class="pi-tag" title="Usernames">[USERNAME]</span>
+                                <span class="pi-tag" title="Passwords & API keys">[CREDENTIAL]</span>
                             </div>
                         </div>
                     </div>
@@ -1509,9 +1494,9 @@
         }
 
         const examples = [
-            "Summarize this ticket: User ad.jsmith (John Smith, john.smith@corp.com) reports VPN issues from IP 10.0.1.55. Badge: B-78432. Incident: INC0012345. Please suggest troubleshooting steps.",
-            "Draft a performance review for Sarah Johnson (EMP-54321, sarah.j@company.com, ext 4567). She works at Desk B3-204 and her manager is raj.kumar@company.com. Highlight her leadership skills.",
-            "Review this config for security issues: db_host=prod-db-01.internal.net, password=Xk9mP2nQ, aws_account=123456789012, api_key=sk-abc123def456ghi789. Also check user ad.admin's access from 172.16.0.50."
+            "Help me write a complaint letter to my bank. My name is Rajesh Kumar, Aadhaar: 1234 5678 9012, PAN: ABCDE1234F, email: rajesh.kumar@gmail.com, phone: +91 98765 43210. The issue is with my account 50100123456789, IFSC: HDFC0001234.",
+            "Review my resume and suggest improvements: John Smith, john.smith@email.com, (555) 123-4567, SSN: 123-45-6789, DOB: March 15, 1990. I live at 123 Main Street, New York, NY 10001. Currently working at Acme Corp.",
+            "Summarize my bank dispute: My credit card 4532-1234-5678-9012 was charged Rs. 45,000 on 15/03/2025. My UPI ID is rajesh@okicici. Contact me at rajesh.k@gmail.com or +91 87654 32100. Account holder: Rajesh Kumar."
         ];
         function loadExample(index) {
             document.getElementById('input-text').value = examples[index];
