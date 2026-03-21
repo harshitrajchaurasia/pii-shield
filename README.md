@@ -41,7 +41,7 @@ When you ask ChatGPT to "review my resume" or "draft a complaint letter," your n
 ## Quick Start
 
 ```bash
-git clone https://github.com/<your-username>/pii-shield.git
+git clone https://github.com/ErosiousHarsh/pii-shield.git
 cd pii-shield
 pip install -e ".[api,excel]"
 cd web_service && uvicorn app:app --port 8082
