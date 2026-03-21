@@ -52,6 +52,12 @@ class PIRemoverConfig:
     redact_locations: bool = True
     redact_credentials: bool = True
     
+    # General public PII redaction options (v2.19)
+    redact_government_ids: bool = True       # Aadhaar, PAN, SSN, DL, Voter ID, NIN, Passport
+    redact_banking: bool = True              # Bank accounts, IFSC, IBAN, SWIFT
+    redact_financial: bool = True            # Credit/debit cards, EPF/UAN, insurance
+    redact_dob: bool = True                  # Date of birth
+
     # IT/ITSM specific redaction options (v2.6)
     redact_ticket_ids: bool = True           # ServiceNow, JIRA tickets
     redact_active_directory: bool = True     # LDAP DN, SAMAccountName, SID
@@ -154,6 +160,10 @@ def load_config_from_yaml(yaml_path: str) -> PIRemoverConfig:
         redact_companies=pi_types.get('companies', True),
         redact_locations=pi_types.get('locations', True),
         redact_credentials=pi_types.get('credentials', True),
+        redact_government_ids=pi_types.get('government_ids', True),
+        redact_banking=pi_types.get('banking', True),
+        redact_financial=pi_types.get('financial', True),
+        redact_dob=pi_types.get('dob', True),
         replacement_token=tokens.get('default', '[REDACTED]'),
         use_typed_tokens=tokens.get('use_typed', True),
         use_granular_tokens=tokens.get('use_granular', True),  # v2.17.0
@@ -198,6 +208,10 @@ def config_to_dict(config: PIRemoverConfig) -> dict:
         'redact_companies': config.redact_companies,
         'redact_locations': config.redact_locations,
         'redact_credentials': config.redact_credentials,
+        'redact_government_ids': config.redact_government_ids,
+        'redact_banking': config.redact_banking,
+        'redact_financial': config.redact_financial,
+        'redact_dob': config.redact_dob,
         'redact_ticket_ids': config.redact_ticket_ids,
         'redact_active_directory': config.redact_active_directory,
         'redact_remote_access_ids': config.redact_remote_access_ids,
@@ -256,6 +270,10 @@ def config_from_dict(data: dict) -> PIRemoverConfig:
         redact_companies=data.get('redact_companies', True),
         redact_locations=data.get('redact_locations', True),
         redact_credentials=data.get('redact_credentials', True),
+        redact_government_ids=data.get('redact_government_ids', True),
+        redact_banking=data.get('redact_banking', True),
+        redact_financial=data.get('redact_financial', True),
+        redact_dob=data.get('redact_dob', True),
         redact_ticket_ids=data.get('redact_ticket_ids', True),
         redact_active_directory=data.get('redact_active_directory', True),
         redact_remote_access_ids=data.get('redact_remote_access_ids', True),

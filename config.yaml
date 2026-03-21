@@ -1,7 +1,7 @@
 # =============================================================================
 # PI REMOVER ENTERPRISE CONFIGURATION
 # =============================================================================
-# Version: 2.3.0
+# Version: 2.19.0
 # This configuration file controls all aspects of PI detection and redaction.
 # Copy this file to customize settings for different environments.
 # =============================================================================
@@ -77,13 +77,16 @@ pi_types:
   hostnames: true
   urls: true
   
-  # Financial & Government
-  government_ids: true    # Aadhaar, PAN, Passport
-  credit_cards: true
+  # Financial & Government (v2.19)
+  government_ids: true    # Aadhaar, PAN, Passport, SSN, DL, Voter ID, NIN
+  banking: true           # Bank accounts, IFSC, IBAN, SWIFT, routing numbers
+  financial: true         # Credit/debit cards, EPF/UAN, insurance policy numbers
+  dob: true               # Date of birth, age
+  credit_cards: true      # (legacy key, now part of 'financial')
   upi_ids: true
-  
+
   # Security
-  credentials: true       # Passwords, API keys
+  credentials: true       # Passwords, API keys, VPN creds, SSH keys
   
   # Context-aware
   signature_blocks: true

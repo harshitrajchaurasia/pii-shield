@@ -490,5 +490,211 @@ class TestEdgeCases:
         assert result.count("[EMAIL]") == 1000
 
 
+class TestBankingRedaction:
+    """Tests for banking information redaction (v2.19)."""
+
+    def test_bank_account_with_keyword(self, remover):
+        """Bank account with 'account' keyword."""
+        result = remover.redact("account 50100123456789")
+        assert "[BANK_ACCOUNT" in result
+        assert "50100123456789" not in result
+
+    def test_bank_account_ac_no(self, remover):
+        """Bank account with 'a/c no' keyword."""
+        result = remover.redact("a/c no 1234567890123")
+        assert "[BANK_ACCOUNT" in result
+
+    def test_ifsc_code(self, remover):
+        """IFSC code detection."""
+        result = remover.redact("IFSC: HDFC0001234")
+        assert "[IFSC]" in result
+        assert "HDFC0001234" not in result
+
+    def test_ifsc_standalone(self, remover):
+        """IFSC code without keyword (format is distinctive)."""
+        result = remover.redact("Code SBIN0012345")
+        assert "[IFSC]" in result
+
+    def test_swift_with_keyword(self, remover):
+        """SWIFT code with context keyword."""
+        result = remover.redact("SWIFT code: HDFCINBB")
+        assert "[SWIFT]" in result
+        assert "HDFCINBB" not in result
+
+    def test_swift_no_keyword_no_match(self, remover):
+        """SWIFT code without keyword should NOT match (avoids false positives)."""
+        result = remover.redact("The word sentence should not be redacted")
+        assert "[SWIFT]" not in result
+
+    def test_routing_number(self, remover):
+        """US routing number with context."""
+        result = remover.redact("routing number: 021000021")
+        assert "[ROUTING_NUM]" in result
+
+    def test_bank_account_and_ifsc_together(self, remover):
+        """Real-world example: bank account + IFSC."""
+        result = remover.redact("My account 50100123456789, IFSC: HDFC0001234")
+        assert "[BANK_ACCOUNT" in result
+        assert "[IFSC]" in result
+        assert "50100123456789" not in result
+        assert "HDFC0001234" not in result
+
+
+class TestGovernmentIDRedaction:
+    """Tests for government ID redaction (v2.19 additions)."""
+
+    def test_ssn_with_dashes(self, remover):
+        """US SSN with dashes."""
+        result = remover.redact("SSN: 123-45-6789")
+        assert "[SSN]" in result
+        assert "123-45-6789" not in result
+
+    def test_ssn_contextual(self, remover):
+        """SSN with keyword, no dashes."""
+        result = remover.redact("social security number 123456789")
+        assert "[SSN]" in result
+
+    def test_driving_license_indian(self, remover):
+        """Indian driving license."""
+        result = remover.redact("DL: MH02 2014 0123456")
+        assert "[DL]" in result
+
+    def test_nin_uk(self, remover):
+        """UK National Insurance Number."""
+        result = remover.redact("NIN: AB123456C")
+        assert "[NIN]" in result
+
+    def test_voter_id_with_keyword(self, remover):
+        """Indian Voter ID with context."""
+        result = remover.redact("voter id: XYZ1234567")
+        assert "[VOTER_ID]" in result
+
+
+class TestFinancialRedaction:
+    """Tests for financial data redaction (v2.19)."""
+
+    def test_credit_card(self, remover):
+        """Credit card number (16 digits in groups)."""
+        result = remover.redact("Card: 4111 1111 1111 1111")
+        assert "[CARD]" in result
+        assert "4111" not in result
+
+    def test_credit_card_with_dashes(self, remover):
+        """Credit card with dashes."""
+        result = remover.redact("Card: 5500-0000-0000-0004")
+        assert "[CARD]" in result
+
+    def test_epf_uan(self, remover):
+        """EPF Universal Account Number."""
+        result = remover.redact("UAN: 100123456789")
+        assert "[EPF_UAN]" in result
+        assert "100123456789" not in result
+
+    def test_insurance_policy(self, remover):
+        """Insurance policy number."""
+        result = remover.redact("policy no: LIC-12345678")
+        assert "[INSURANCE_POLICY]" in result
+
+
+class TestDOBRedaction:
+    """Tests for date of birth and age redaction (v2.19)."""
+
+    def test_dob_with_keyword(self, remover):
+        """DOB with keyword."""
+        result = remover.redact("DOB is 15/03/1990")
+        assert "[DOB]" in result
+        assert "15/03/1990" not in result
+
+    def test_date_of_birth_full_keyword(self, remover):
+        """Full 'date of birth' keyword."""
+        result = remover.redact("date of birth: 25-12-1985")
+        assert "[DOB]" in result
+
+    def test_born_on(self, remover):
+        """'Born on' keyword."""
+        result = remover.redact("born on 01/01/2000")
+        assert "[DOB]" in result
+
+    def test_age_with_keyword(self, remover):
+        """Age with keyword."""
+        result = remover.redact("age is 35 years")
+        assert "[AGE]" in result
+        assert "35" not in result
+
+    def test_age_colon(self, remover):
+        """Age with colon separator."""
+        result = remover.redact("age: 28")
+        assert "[AGE]" in result
+
+
+class TestCredentialRedaction:
+    """Tests for credential patterns (v2.19 additions)."""
+
+    def test_api_key(self, remover):
+        """API key detection."""
+        result = remover.redact("api_key: abcdefghijklmnopqrstuvwxyz123")
+        assert "[API_KEY]" in result
+
+    def test_vpn_credentials(self, remover):
+        """VPN credential detection."""
+        result = remover.redact("vpn password: secret123")
+        assert "[CREDENTIAL" in result
+
+    def test_ssh_private_key(self, remover):
+        """SSH private key header detection."""
+        result = remover.redact("-----BEGIN RSA PRIVATE KEY-----")
+        assert "[SSH_KEY]" in result
+
+    def test_access_token(self, remover):
+        """Access token detection."""
+        result = remover.redact("access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
+        assert "[API_KEY]" in result
+
+
+class TestGeneralPublicPIIScenario:
+    """End-to-end test for the general public use case."""
+
+    def test_bank_complaint_letter(self, remover):
+        """The user's original example — bank complaint with multiple PI types."""
+        text = (
+            "Help me write a complaint letter to my bank. "
+            "My name is Rajesh Kumar, Aadhaar: 1234 5678 9012, "
+            "PAN: ABCDE1234F, email: rajesh.kumar@gmail.com, "
+            "phone: +91 98765 43210. The issue is with my "
+            "account 50100123456789, IFSC: HDFC0001234."
+        )
+        result = remover.redact(text)
+        # All PI should be redacted
+        assert "Rajesh" not in result
+        assert "1234 5678 9012" not in result
+        assert "ABCDE1234F" not in result
+        assert "rajesh.kumar@gmail.com" not in result
+        assert "98765 43210" not in result
+        assert "50100123456789" not in result
+        assert "HDFC0001234" not in result
+        # Tokens should be present
+        assert "[NAME]" in result
+        assert "[AADHAAR]" in result
+        assert "[PAN]" in result
+        assert "[EMAIL]" in result
+        assert "[PHONE_IN]" in result
+        assert "[BANK_ACCOUNT" in result
+        assert "[IFSC]" in result
+
+    def test_insurance_claim(self, remover):
+        """Insurance claim with multiple PI types."""
+        text = (
+            "Claim by Priya Sharma, DOB is 15/03/1990, "
+            "policy no: LIC-99887766, UAN: 100987654321, "
+            "email: priya.sharma@yahoo.com"
+        )
+        result = remover.redact(text)
+        assert "Priya" not in result
+        assert "15/03/1990" not in result
+        assert "LIC-99887766" not in result
+        assert "100987654321" not in result
+        assert "priya.sharma@yahoo.com" not in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

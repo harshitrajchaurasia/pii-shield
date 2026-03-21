@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PI Remover is an enterprise-grade Personal Information (PI/PII) redaction tool designed for IT support data. It detects and removes 35+ types of sensitive information (names, emails, phones, employee IDs, IPs, hostnames, financial data, government IDs, etc.) to enable safe LLM processing.
+PI Remover is an enterprise-grade Personal Information (PI/PII) redaction tool for both IT support data and general public use. It detects and removes 45+ types of sensitive information (names, emails, phones, employee IDs, IPs, hostnames, banking info, government IDs, financial data, credentials, etc.) to enable safe LLM processing.
 
-**Version**: 2.18.0 | **Python**: 3.11+ | **License**: MIT
+**Version**: 2.19.0 | **Python**: 3.11+ | **License**: MIT
 
 ## Architecture
 
