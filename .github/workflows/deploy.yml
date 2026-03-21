@@ -1,0 +1,73 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: # Allow manual trigger
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # Run tests before deploying
+  test:
+    name: Pre-deploy Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install and test
+        run: |
+          pip install -e ".[dev,excel,api]"
+          pytest tests/ -v --tb=short --ignore=tests/test_service_integration.py --ignore=tests/test_api.py
+
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    # Only deploy from main branch (not PRs)
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      contents: read
+      id-token: write # Required for Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy pii-shield \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --source . \
+            --region us-central1 \
+            --memory 512Mi \
+            --cpu 1 \
+            --max-instances 1 \
+            --min-instances 0 \
+            --allow-unauthenticated \
+            --set-env-vars "STANDALONE_MODE=true,ENVIRONMENT=production,LOG_LEVEL=WARNING" \
+            --quiet
+
+      - name: Show deployment URL
+        run: |
+          gcloud run services describe pii-shield \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --region us-central1 \
+            --format "value(status.url)"

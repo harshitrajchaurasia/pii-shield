@@ -81,10 +81,10 @@ all = [
 pi-remover = "pi_remover.core:run_cli"
 
 [project.urls]
-Homepage = "https://github.com/your-org/pi-remover"
-Documentation = "https://github.com/your-org/pi-remover#readme"
-Repository = "https://github.com/your-org/pi-remover"
-Issues = "https://github.com/your-org/pi-remover/issues"
+Homepage = "https://github.com/ErosiousHarsh/pii-shield"
+Documentation = "https://github.com/ErosiousHarsh/pii-shield#readme"
+Repository = "https://github.com/ErosiousHarsh/pii-shield"
+Issues = "https://github.com/ErosiousHarsh/pii-shield/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
