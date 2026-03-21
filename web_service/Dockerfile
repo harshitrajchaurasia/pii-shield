@@ -24,7 +24,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     API_URL=http://localhost:8080 \
     # Web service client credentials for API auth (override in production)
     WEB_CLIENT_ID=pi-internal-web-service \
-    WEB_CLIENT_SECRET=change-me-in-production
+    WEB_CLIENT_SECRET=""
 
 # Set working directory
 WORKDIR /app
@@ -89,8 +89,8 @@ ENV UPLOAD_DIR=/app/uploads
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/ready')" || exit 1
 
 # Run the web service
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]

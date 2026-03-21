@@ -540,6 +540,61 @@ class TestBankingRedaction:
         assert "HDFC0001234" not in result
 
 
+class TestContextAwareDetection:
+    """Tests for v2.20 context-aware detection improvements."""
+
+    def test_bank_account_transfer_context(self, remover):
+        """Bank account with 'transfer to' context."""
+        result = remover.redact("transfer to 50100123456789")
+        assert "[BANK_ACCOUNT" in result
+        assert "50100123456789" not in result
+
+    def test_bank_account_deposit_context(self, remover):
+        """Bank account with 'deposit into' context."""
+        result = remover.redact("deposit into 50100123456789")
+        assert "[BANK_ACCOUNT" in result
+
+    def test_bank_account_beneficiary_context(self, remover):
+        """Bank account with 'beneficiary' keyword."""
+        result = remover.redact("beneficiary 1234567890123")
+        assert "[BANK_ACCOUNT" in result
+
+    def test_bank_account_pay_to_context(self, remover):
+        """Bank account with 'pay to' keyword."""
+        result = remover.redact("pay to 9876543210123")
+        assert "[BANK_ACCOUNT" in result
+
+    def test_international_name_two_word(self, remover):
+        """Two-word name with international first name in dictionary."""
+        result = remover.redact("Dear John Smith, your account is ready")
+        assert "[NAME]" in result
+
+    def test_single_name_greeting_context(self, remover):
+        """Single name after greeting context (conservative)."""
+        result = remover.redact("Hello Michael, please find attached")
+        assert "[NAME]" in result
+
+    def test_single_name_mr_context(self, remover):
+        """Single name after Mr title."""
+        result = remover.redact("Mr. David called regarding the issue")
+        assert "[NAME]" in result
+
+    def test_ssn_tax_id_context(self, remover):
+        """SSN with 'tax id' keyword."""
+        result = remover.redact("tax id 123-45-6789")
+        assert "123-45-6789" not in result
+
+    def test_ssn_taxpayer_context(self, remover):
+        """SSN with 'taxpayer identification' keyword."""
+        result = remover.redact("taxpayer identification 123-45-6789")
+        assert "123-45-6789" not in result
+
+    def test_adjacent_name_cleanup(self, remover):
+        """Adjacent last name after [NAME] token should be caught."""
+        result = remover.redact("from Rajesh Kumar via email")
+        assert "Kumar" not in result
+
+
 class TestGovernmentIDRedaction:
     """Tests for government ID redaction (v2.19 additions)."""
 
@@ -694,6 +749,49 @@ class TestGeneralPublicPIIScenario:
         assert "LIC-99887766" not in result
         assert "100987654321" not in result
         assert "priya.sharma@yahoo.com" not in result
+
+
+class TestPhase2Improvements:
+    """Tests for Phase 2: Detection accuracy improvements."""
+
+    def test_aadhaar_false_positive_version_number(self, remover):
+        """12-digit number starting with 0 or 1 should NOT be redacted without context."""
+        result = remover.redact("version 1234 5678 9012")
+        assert "1234 5678 9012" in result  # Should NOT be redacted
+
+    def test_aadhaar_false_positive_reference_number(self, remover):
+        """Random 12-digit reference should NOT match Aadhaar."""
+        result = remover.redact("Reference: 0123 4567 8901")
+        assert "0123 4567 8901" in result  # Should NOT be redacted
+
+    def test_aadhaar_with_keyword_context(self, remover):
+        """Aadhaar keyword nearby should trigger detection even for numbers starting with 1."""
+        result = remover.redact("Aadhaar: 1234 5678 9012")
+        assert "1234 5678 9012" not in result
+        assert "[AADHAAR]" in result
+
+    def test_aadhaar_valid_first_digit(self, remover):
+        """Aadhaar starting with 2-9 with keyword should be detected."""
+        result = remover.redact("My Aadhaar is 2345 6789 0123")
+        assert "2345 6789 0123" not in result
+
+    def test_homoglyph_email_detection(self, remover):
+        """Email with Cyrillic homoglyphs should still be detected."""
+        # \u043e is Cyrillic 'о' (looks identical to Latin 'o')
+        result = remover.redact("email: j\u043ehn@c\u043empany.com")
+        assert "[EMAIL]" in result
+
+    def test_email_fragment_after_name_redaction(self, remover):
+        """Email fragment left after name redaction should be cleaned up."""
+        # This tests the cleanup pass — if name "john" gets redacted but ".smith@corp.com" remains
+        result = remover.redact("Contact john.smith@corp.com for details")
+        assert "@corp.com" not in result
+        assert "[EMAIL]" in result
+
+    def test_aadhaar_uid_keyword(self, remover):
+        """UID keyword should also trigger Aadhaar detection."""
+        result = remover.redact("UID number: 1111 2222 3333")
+        assert "1111 2222 3333" not in result
 
 
 if __name__ == "__main__":

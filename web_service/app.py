@@ -32,6 +32,8 @@ import logging
 import secrets
 import asyncio
 import argparse
+import traceback
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -208,6 +210,24 @@ UPLOAD_DIR = APP_CONFIG['upload']['upload_dir'] or tempfile.gettempdir()
 MAX_FILE_SIZE = APP_CONFIG['upload']['max_file_size']
 ALLOWED_EXTENSIONS = SecurityConfig.ALLOWED_EXTENSIONS
 ENVIRONMENT = APP_CONFIG['service']['environment']
+JOB_TTL_SECONDS = 600  # Auto-delete uploaded files after 10 minutes
+
+# ThreadPoolExecutor for CPU-bound PIRemover work (prevents blocking the event loop)
+_executor = ThreadPoolExecutor(max_workers=4)
+
+# Cached PIRemover instances (avoids reloading spaCy on every call)
+_cached_removers: Dict[bool, Any] = {}
+
+
+def _get_remover(fast_mode: bool):
+    """Get or create a cached PIRemover instance."""
+    if fast_mode not in _cached_removers:
+        config = PIRemoverConfig(
+            enable_ner=not fast_mode,
+            use_typed_tokens=True
+        )
+        _cached_removers[fast_mode] = PIRemover(config)
+    return _cached_removers[fast_mode]
 
 # Configure logging
 setup_structured_logging(
@@ -421,6 +441,46 @@ async def background_health_check():
             await asyncio.sleep(5)  # Wait before retry
 
 
+async def background_job_cleanup():
+    """Background task that auto-deletes expired job files (zero data retention)."""
+    logger.info("Starting background job cleanup task (TTL=%ds)", JOB_TTL_SECONDS)
+
+    while True:
+        try:
+            await asyncio.sleep(60)  # Check every 60 seconds
+
+            now = datetime.now()
+            expired_jobs = []
+
+            for job_id, job in list(jobs.items()):
+                created_str = job.get("created_at")
+                if not created_str:
+                    continue
+                try:
+                    created_at = datetime.fromisoformat(created_str)
+                    if (now - created_at).total_seconds() > JOB_TTL_SECONDS:
+                        expired_jobs.append(job_id)
+                except (ValueError, TypeError):
+                    continue
+
+            for job_id in expired_jobs:
+                job = jobs.pop(job_id, None)
+                if job and job.get("input_file"):
+                    input_dir = Path(job["input_file"]).parent
+                    if input_dir.exists():
+                        shutil.rmtree(input_dir, ignore_errors=True)
+                        logger.info("Auto-cleaned expired job %s", job_id[:8])
+
+        except asyncio.CancelledError:
+            logger.info("Background job cleanup task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Background job cleanup error: {e}")
+
+
+_cleanup_task = None
+
+
 async def get_api_client() -> PIRemoverAPIClient:
     """Get or create the API client singleton."""
     global _api_client
@@ -442,10 +502,16 @@ async def get_api_client() -> PIRemoverAPIClient:
                 client_secret = client_data.get('secret', '')
             
             if not client_secret:
+                if ENVIRONMENT == "production":
+                    raise RuntimeError(
+                        "FATAL: WEB_CLIENT_SECRET not configured. "
+                        "Set WEB_CLIENT_SECRET environment variable for production."
+                    )
                 # Final fallback (development only)
                 client_secret = "YOUR_WEB_CLIENT_SECRET_HERE"
                 logger.warning(
-                    f"Client secret not found in env/config for {client_id}, using fallback"
+                    f"Client secret not found in env/config for {client_id}, "
+                    "using dev fallback — NOT SAFE FOR PRODUCTION"
                 )
             
             _api_client = PIRemoverAPIClient(
@@ -593,15 +659,11 @@ def redact_text_locally(text: str, fast_mode: bool = False) -> Dict[str, Any]:
     
     start_time = time.perf_counter()
     
-    config = PIRemoverConfig(
-        enable_ner=not fast_mode,
-        use_typed_tokens=True
-    )
-    remover = PIRemover(config)
+    remover = _get_remover(fast_mode)
     result = remover.redact_with_details(text)
-    
+
     processing_time = (time.perf_counter() - start_time) * 1000
-    
+
     # Build response similar to API format
     redactions = []
     if hasattr(result, 'redactions') and result.redactions:
@@ -612,7 +674,7 @@ def redact_text_locally(text: str, fast_mode: bool = False) -> Dict[str, Any]:
                 'type': r.pi_type if hasattr(r, 'pi_type') else 'UNKNOWN',
                 'confidence': r.confidence if hasattr(r, 'confidence') else 1.0,
             })
-    
+
     return {
         'redacted_text': result.redacted_text,
         'redactions': redactions,
@@ -639,19 +701,21 @@ async def redact_text_hybrid(text: str, fast_mode: bool = False) -> Dict[str, An
     global _api_status
     hybrid_config = APP_CONFIG.get('hybrid', {})
     
+    loop = asyncio.get_event_loop()
+
     # If standalone mode, always use local
     if hybrid_config.get('standalone_mode', False):
         logger.debug("Standalone mode: using local PIRemover")
-        result = redact_text_locally(text, fast_mode)
+        result = await loop.run_in_executor(_executor, redact_text_locally, text, fast_mode)
         result['source'] = 'local'
         return result
-    
+
     # OPTIMIZATION: Check cached API status for instant routing
     # If API is known to be unavailable, skip directly to local fallback
     if not _api_status.should_try_api():
         if hybrid_config.get('fallback_to_local', True) and LOCAL_REMOVER_AVAILABLE:
             logger.debug("API unavailable (cached), using local PIRemover immediately")
-            result = redact_text_locally(text, fast_mode)
+            result = await loop.run_in_executor(_executor, redact_text_locally, text, fast_mode)
             result['source'] = 'local_fallback'
             result['routing_reason'] = 'api_unavailable_cached'
             return result
@@ -676,10 +740,10 @@ async def redact_text_hybrid(text: str, fast_mode: bool = False) -> Dict[str, An
     # Fallback to local if enabled
     if hybrid_config.get('fallback_to_local', True) and LOCAL_REMOVER_AVAILABLE:
         logger.info("Using local PIRemover as fallback")
-        result = redact_text_locally(text, fast_mode)
+        result = await loop.run_in_executor(_executor, redact_text_locally, text, fast_mode)
         result['source'] = 'local_fallback'
         return result
-    
+
     # No fallback available - raise error
     raise ServiceUnavailableError("API service unavailable and local fallback disabled")
 
@@ -698,12 +762,8 @@ def redact_batch_locally(texts: List[str], fast_mode: bool = False) -> List[str]
     if not LOCAL_REMOVER_AVAILABLE or PIRemover is None:
         raise RuntimeError("Local PIRemover not available")
     
-    config = PIRemoverConfig(
-        enable_ner=not fast_mode,
-        use_typed_tokens=True
-    )
-    remover = PIRemover(config)
-    
+    remover = _get_remover(fast_mode)
+
     results = []
     for text in texts:
         result = remover.redact_with_details(text)
@@ -728,18 +788,19 @@ async def redact_batch_hybrid(texts: List[str], fast_mode: bool = False) -> List
     """
     global _api_status
     hybrid_config = APP_CONFIG.get('hybrid', {})
-    
+    loop = asyncio.get_event_loop()
+
     # If standalone mode, always use local
     if hybrid_config.get('standalone_mode', False):
         logger.debug("Standalone mode: using local PIRemover for batch")
-        return redact_batch_locally(texts, fast_mode)
-    
+        return await loop.run_in_executor(_executor, redact_batch_locally, texts, fast_mode)
+
     # OPTIMIZATION: Check cached API status for instant routing
     # If API is known to be unavailable, skip directly to local fallback
     if not _api_status.should_try_api():
         if hybrid_config.get('fallback_to_local', True) and LOCAL_REMOVER_AVAILABLE:
             logger.debug("API unavailable (cached), using local PIRemover for batch immediately")
-            return redact_batch_locally(texts, fast_mode)
+            return await loop.run_in_executor(_executor, redact_batch_locally, texts, fast_mode)
     
     # Try API first if preferred and status indicates it might be available
     if hybrid_config.get('prefer_api', True):
@@ -759,8 +820,8 @@ async def redact_batch_hybrid(texts: List[str], fast_mode: bool = False) -> List
     # Fallback to local if enabled
     if hybrid_config.get('fallback_to_local', True) and LOCAL_REMOVER_AVAILABLE:
         logger.info("Using local PIRemover as fallback for batch")
-        return redact_batch_locally(texts, fast_mode)
-    
+        return await loop.run_in_executor(_executor, redact_batch_locally, texts, fast_mode)
+
     # No fallback available - raise error
     raise ServiceUnavailableError("API service unavailable and local fallback disabled")
 
@@ -1033,6 +1094,8 @@ async def process_file_background(
     if not job:
         return
 
+    job["started_at"] = datetime.now().isoformat()
+
     try:
         input_path = Path(input_file)
         output_file = input_path.parent / f"{input_path.stem}_cleaned{input_path.suffix}"
@@ -1064,6 +1127,8 @@ async def process_file_background(
         logger.error(f"Error processing file for job {job_id}: {e}")
         job["status"] = "failed"
         job["message"] = f"Processing failed: {str(e)}"
+        job["error_details"] = traceback.format_exc()
+        job["failed_at"] = datetime.now().isoformat()
 
 
 async def process_csv_file(input_path: Path, output_path: Path, columns: List[str], fast_mode: bool, job: dict):
@@ -1337,6 +1402,24 @@ async def health_check():
     }
 
 
+@app.get("/ready")
+async def readiness_check():
+    """Readiness probe — returns 200 only when PIRemover is fully initialized."""
+    try:
+        remover = _get_remover(fast_mode=True)
+        if remover is None:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "reason": "PIRemover not initialized"}
+            )
+        return {"status": "ready", "local_remover": True, "version": __version__}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": str(e)}
+        )
+
+
 @app.get("/api/service-info")
 async def service_info():
     """Get information about the service configuration."""
@@ -1439,14 +1522,19 @@ async def startup_event():
     _background_task = asyncio.create_task(background_health_check())
     logger.info("Background API health check task started")
 
+    # Start background job cleanup task (zero data retention)
+    global _cleanup_task
+    _cleanup_task = asyncio.create_task(background_job_cleanup())
+    logger.info("Background job cleanup task started")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown."""
-    global _background_task, _api_client
-    
+    global _background_task, _cleanup_task, _api_client
+
     logger.info("PI Remover Web Service shutting down")
-    
+
     # Cancel background health check task
     if _background_task:
         _background_task.cancel()
@@ -1455,7 +1543,28 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         logger.info("Background health check task stopped")
-    
+
+    # Cancel background job cleanup task
+    if _cleanup_task:
+        _cleanup_task.cancel()
+        try:
+            await _cleanup_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Background job cleanup task stopped")
+
+    # Clean up all uploaded files (zero data retention on shutdown)
+    for job_id, job in list(jobs.items()):
+        try:
+            if job.get("input_file"):
+                input_dir = Path(job["input_file"]).parent
+                if input_dir.exists():
+                    shutil.rmtree(input_dir, ignore_errors=True)
+        except Exception as e:
+            logger.error(f"Shutdown cleanup error for job {job_id[:8]}: {e}")
+    jobs.clear()
+    logger.info("All job files cleaned up on shutdown")
+
     # Close API client
     if _api_client:
         await _api_client.close()

@@ -1,11 +1,11 @@
-# PII Shield
+# PII Shield — Context-Aware Personal Data Protection
 
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![PII Types](https://img.shields.io/badge/PII_types-35+-orange)
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen?logo=googlecloud)](https://pii-shield-49982461185.us-central1.run.app)
 
-**Stop leaking personal data to LLMs.**
+**Context-aware PII detection — stop leaking personal data to LLMs.**
 
 When you ask ChatGPT to "review my resume" or "draft a complaint letter," your name, phone number, Aadhaar, PAN, and other personal details get sent to external servers. PII Shield sits between you and the AI — it detects and replaces personal information with safe tokens, so the AI still understands your request without ever seeing your real data.
 
@@ -32,6 +32,7 @@ When you ask ChatGPT to "review my resume" or "draft a complaint letter," your n
 ## Features
 
 - **35+ PII types** — names, emails, phones, Aadhaar, PAN, SSN, passport, credit cards, DOB, bank accounts, UPI, and more
+- **Context-aware detection** — understands surrounding keywords like "transfer to", "Dear", "password:" to catch PII that simple regex misses
 - **Web UI** — paste text or drag-and-drop files (CSV, Excel, JSON, DOCX, PDF)
 - **Instant results** — regex + dictionary detection, no external API calls
 - **Dark/light theme** — clean, modern interface

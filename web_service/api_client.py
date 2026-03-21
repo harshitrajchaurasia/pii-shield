@@ -73,8 +73,8 @@ class CircuitState(Enum):
 class CircuitBreakerConfig:
     """Circuit breaker configuration."""
     enabled: bool = True
-    failure_threshold: int = 5      # Failures before opening
-    recovery_timeout: float = 30.0  # Seconds before trying again
+    failure_threshold: int = 3      # Failures before opening
+    recovery_timeout: float = 10.0  # Seconds before trying again
     half_open_max_calls: int = 3    # Calls allowed in half-open
 
 
