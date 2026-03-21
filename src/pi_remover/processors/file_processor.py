@@ -24,7 +24,7 @@ import logging
 import multiprocessing as mp
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 from tqdm import tqdm
@@ -33,7 +33,6 @@ from pi_remover.config import PIRemoverConfig, config_to_dict, config_from_dict
 from pi_remover.utils import (
     IS_WINDOWS,
     get_multiprocessing_method,
-    configure_multiprocessing,
 )
 
 # Initialize logger

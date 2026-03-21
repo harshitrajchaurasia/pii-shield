@@ -125,7 +125,7 @@ def get_control_char_pattern(config: SanitizerConfig) -> re.Pattern:
     if allowed:
         allowed_str = "".join(allowed)
         # Match control chars except allowed ones
-        return re.compile(f"[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]")
+        return re.compile("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]")
     else:
         return re.compile(r"[\x00-\x1f\x7f]")
 

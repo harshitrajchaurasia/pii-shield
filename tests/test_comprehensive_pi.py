@@ -250,7 +250,7 @@ def run_tests():
         
         print(f"\n  Input:  {text}")
         print(f"  Output: {result}")
-        print(f"  Context preserved: {len(preserved) > 0} ✅" if preserved else f"  Context preserved: CHECK ⚠️")
+        print(f"  Context preserved: {len(preserved) > 0} ✅" if preserved else "  Context preserved: CHECK ⚠️")
     
     return passed_tests == total_tests
 

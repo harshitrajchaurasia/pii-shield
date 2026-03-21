@@ -247,7 +247,7 @@ class SpacyModelManager:
             
             return nlp
             
-        except OSError as e:
+        except OSError:
             cls._failed_models.add(model_name)
             logger.warning(
                 f"spaCy model '{model_name}' not found. "

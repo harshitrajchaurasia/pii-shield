@@ -19,7 +19,7 @@ Usage:
 
 import multiprocessing as mp
 from dataclasses import dataclass, field
-from typing import Set, Optional
+from typing import Set
 
 # Default CPU count fallback when detection fails
 DEFAULT_CPU_COUNT = 4
