@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pi-remover"
-version = "2.16.0"
+version = "2.19.0"
 description = "Enterprise-grade Personal Information (PI/PII) removal tool for IT support data"
 readme = "README.md"
 license = {text = "MIT"}

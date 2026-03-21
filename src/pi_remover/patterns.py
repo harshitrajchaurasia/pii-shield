@@ -369,23 +369,43 @@ class PIPatterns:
         r'\b[A-Z]\d{7}\b',
         re.IGNORECASE
     )
-    # US Social Security Number (SSN) - XXX-XX-XXXX
+    # US Social Security Number (SSN) - XXX-XX-XXXX (requires separator or context)
     SSN = re.compile(
-        r'\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b'
+        r'(?i)(?:(?:ssn|social\s*security)[\s.:_#-]*)?'
+        r'\b(\d{3}[-]\d{2}[-]\d{4})\b'
+    )
+    # SSN with context keyword (allows no separator when keyword present)
+    SSN_CONTEXTUAL = re.compile(
+        r'(?i)(?:ssn|social\s*security\s*(?:no|number|#)?)[\s.:_#-]*(\d{9})\b'
     )
     # Driving License (Indian) - varies by state, case-insensitive
     DRIVING_LICENSE_IN = re.compile(
         r'\b[A-Z]{2}[\s-]?\d{2}[\s-]?\d{4}[\s-]?\d{7}\b',
         re.IGNORECASE
     )
-    # Vehicle Registration (Indian) - case-insensitive
+    # Vehicle Registration (Indian) - requires context or strict format
+    # Strict format: 2-letter state code + 2-digit district + 1-2 letter series + 4-digit number
     VEHICLE_REG_IN = re.compile(
-        r'\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{1,4}\b',
-        re.IGNORECASE
+        r'(?i)(?:(?:vehicle|registration|reg|number\s*plate|license\s*plate|car\s*no)[\s.:_#-]*)?'
+        r'\b([A-Z]{2}\s?-?\d{2}\s?-?[A-Z]{1,3}\s?-?\d{4})\b'
     )
     # National Insurance Number (UK NIN) - case-insensitive
     NIN_UK = re.compile(
         r'\b[A-Z]{2}\d{6}[A-Z]\b',
+        re.IGNORECASE
+    )
+    # Voter ID / EPIC (Indian) - 3 letters + 7 digits, requires context to avoid false positives
+    VOTER_ID_IN = re.compile(
+        r'(?i)(?:voter\s*(?:id|card)|epic|electoral)[\s.:_#-]*(?:no|number|#)?[\s.:_#-]*'
+        r'([A-Z]{3}\d{7})\b'
+    )
+    # EPF Universal Account Number (UAN) - 12 digits with context
+    EPF_UAN = re.compile(
+        r'(?i)(?:uan|epf|pf)[\s.:_#-]*(?:no|number|#)?[\s.:_#-]*(\d{12})\b'
+    )
+    # EPF Member ID - STATE/OFFICE/ACCOUNT format
+    EPF_MEMBER_ID = re.compile(
+        r'\b[A-Z]{2}[\s/]?[A-Z]{3}[\s/]?\d{7}[\s/]?\d{3}[\s/]?\d{7}\b',
         re.IGNORECASE
     )
 
@@ -393,24 +413,36 @@ class PIPatterns:
     # BANKING PATTERNS
     # =========================================================================
 
-    # Bank Account Number (Indian - 9 to 18 digits)
+    # Bank Account Number (Indian - 9 to 18 digits, requires context keyword)
     BANK_ACCOUNT_IN = re.compile(
-        r'(?i)\b(?:a/?c|account)[\s.:_-]*(?:no|number|#)?[\s.:_-]*(\d{9,18})\b'
+        r'(?i)\b(?:a/?c|account|acct)[\s.:_-]*(?:no|number|num|#)?[\s.:_-]*(\d{9,18})\b'
     )
-    # IFSC Code (Indian bank) - case-insensitive
+    # Bank Account with IFSC context (standalone long number near IFSC)
+    BANK_ACCOUNT_STANDALONE = re.compile(
+        r'\b(\d{9,18})\b'
+    )
+    # IFSC Code (Indian bank) - 4 letters + 0 + 6 alphanumeric
     IFSC = re.compile(
         r'\b[A-Z]{4}0[A-Z0-9]{6}\b',
         re.IGNORECASE
     )
-    # IBAN (International Bank Account Number) - case-insensitive
+    # IFSC with context keyword
+    IFSC_CONTEXTUAL = re.compile(
+        r'(?i)(?:ifsc)[\s.:_#-]*(?:code)?[\s.:_#-]*([A-Z]{4}0[A-Z0-9]{6})\b'
+    )
+    # IBAN (International Bank Account Number) - 2 letters + 2 digits + up to 30 alphanumeric
     IBAN = re.compile(
-        r'\b[A-Z]{2}\d{2}[A-Z0-9]{4,30}\b',
+        r'\b[A-Z]{2}\d{2}\s?[A-Z0-9]{4}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?\b',
         re.IGNORECASE
     )
-    # SWIFT/BIC Code - case-insensitive
+    # SWIFT/BIC Code - requires context keyword to avoid matching common English words
+    # Format: 4 bank + 2 country + 2 location [+ 3 branch] (8 or 11 chars)
     SWIFT = re.compile(
-        r'\b[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b',
-        re.IGNORECASE
+        r'(?i)(?:swift|bic|swift\s*code|bic\s*code)[\s.:_#-]*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b'
+    )
+    # Routing Number (US bank) - 9 digits with context
+    ROUTING_NUMBER = re.compile(
+        r'(?i)(?:routing|aba|transit)[\s.:_#-]*(?:no|number|num|#)?[\s.:_#-]*(\d{9})\b'
     )
 
     # =========================================================================
@@ -567,8 +599,23 @@ class PIPatterns:
     # =========================================================================
 
     DOB = re.compile(
-        r'(?i)\b(?:dob|date\s*of\s*birth|birth\s*date)[\s.:_-]*'
-        r'(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b'
+        r'(?i)\b(?:dob|date\s*of\s*birth|birth\s*date|born\s*(?:on)?)'
+        r'[\s.:_-]*(?:is\s*)?'
+        r'(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})\b'
+    )
+    # Age with context
+    AGE = re.compile(
+        r'(?i)\b(?:age)[\s.:_-]*(?:is\s*)?(\d{1,3})\s*(?:years?|yrs?|y/?o)?\b'
+    )
+
+    # =========================================================================
+    # INSURANCE / FINANCIAL DOCUMENT PATTERNS (v2.19)
+    # =========================================================================
+
+    # Insurance policy number with context
+    INSURANCE_POLICY = re.compile(
+        r'(?i)(?:policy|insurance)[\s.:_#-]*(?:no|number|num|id|#)?[\s.:_#-]*'
+        r'([A-Z0-9]{2,5}[-/]?[A-Z0-9]{5,15})\b'
     )
 
     # =========================================================================

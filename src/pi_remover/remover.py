@@ -33,7 +33,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Version
-__version__ = "2.17.0"
+__version__ = "2.19.0"
 
 
 class PIRemover:
@@ -785,20 +785,88 @@ class PIRemover:
     def _redact_credentials(self, text: str) -> List[Tuple[int, int, str]]:
         """Detect and mark passwords/credentials for redaction."""
         positions = []
+        # Passwords with explicit assignment
         for match in self.patterns.PASSWORD.finditer(text):
             password_value = match.group(1).lower().rstrip('.,;:!?')
             if password_value in self.patterns.PASSWORD_NON_CREDENTIALS:
                 continue
             positions.append((match.start(), match.end(), self._get_token("CREDENTIAL")))
+        # VPN/Remote credentials
+        for match in self.patterns.VPN_CREDS.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("CREDENTIAL", "VPN")))
+        # API keys and access tokens
+        for match in self.patterns.API_KEY.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("API_KEY")))
+        # SSH private key headers
+        positions.extend(self._find_pattern_matches(text, self.patterns.SSH_KEY, "SSH_KEY"))
+        # Domain ID
+        for match in self.patterns.DOMAIN_ID.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("DOMAIN_ID")))
         return positions
 
     def _redact_government_ids(self, text: str) -> List[Tuple[int, int, str]]:
-        """Detect and mark government IDs (Aadhaar, PAN, Passport)."""
+        """Detect and mark government IDs (Aadhaar, PAN, Passport, SSN, DL, Voter ID, NIN)."""
         positions = []
         positions.extend(self._find_pattern_matches(text, self.patterns.AADHAAR, "AADHAAR"))
         positions.extend(self._find_pattern_matches(text, self.patterns.PAN, "PAN"))
         positions.extend(self._find_pattern_matches(text, self.patterns.PASSPORT, "PASSPORT"))
+        # Credit card moved to _redact_financial()
+        # SSN (US) - with separator
+        positions.extend(self._find_pattern_matches(text, self.patterns.SSN, "SSN"))
+        # SSN with context keyword (no separator needed)
+        for match in self.patterns.SSN_CONTEXTUAL.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("SSN")))
+        # Driving License (Indian)
+        positions.extend(self._find_pattern_matches(text, self.patterns.DRIVING_LICENSE_IN, "DL"))
+        # Vehicle Registration (Indian)
+        positions.extend(self._find_pattern_matches(text, self.patterns.VEHICLE_REG_IN, "VEHICLE_REG"))
+        # National Insurance Number (UK)
+        positions.extend(self._find_pattern_matches(text, self.patterns.NIN_UK, "NIN"))
+        # Voter ID / EPIC (Indian)
+        positions.extend(self._find_pattern_matches(text, self.patterns.VOTER_ID_IN, "VOTER_ID"))
+        return positions
+
+    def _redact_banking(self, text: str) -> List[Tuple[int, int, str]]:
+        """Detect and mark banking information (account numbers, IFSC, IBAN, SWIFT)."""
+        positions = []
+        # Bank account with explicit keyword (a/c, account)
+        for match in self.patterns.BANK_ACCOUNT_IN.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("BANK_ACCOUNT", "IN")))
+        # IFSC Code (always redact - format is distinctive: 4 letters + 0 + 6 chars)
+        positions.extend(self._find_pattern_matches(text, self.patterns.IFSC, "IFSC"))
+        # IBAN
+        positions.extend(self._find_pattern_matches(text, self.patterns.IBAN, "IBAN"))
+        # SWIFT/BIC
+        positions.extend(self._find_pattern_matches(text, self.patterns.SWIFT, "SWIFT"))
+        # US Routing number with context
+        for match in self.patterns.ROUTING_NUMBER.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("ROUTING_NUM")))
+        return positions
+
+    def _redact_financial(self, text: str) -> List[Tuple[int, int, str]]:
+        """Detect and mark financial info (credit cards, EPF/UAN, insurance)."""
+        positions = []
+        # Credit/Debit card numbers (16 digits in groups of 4)
         positions.extend(self._find_pattern_matches(text, self.patterns.CREDIT_CARD, "CARD"))
+        # EPF/UAN with context keyword
+        for match in self.patterns.EPF_UAN.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("EPF_UAN")))
+        # EPF Member ID
+        positions.extend(self._find_pattern_matches(text, self.patterns.EPF_MEMBER_ID, "EPF_ID"))
+        # Insurance policy with context
+        for match in self.patterns.INSURANCE_POLICY.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("INSURANCE_POLICY")))
+        return positions
+
+    def _redact_dob(self, text: str) -> List[Tuple[int, int, str]]:
+        """Detect and mark date of birth and age information."""
+        positions = []
+        # DOB with context keyword (dob, date of birth, born on)
+        for match in self.patterns.DOB.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("DOB")))
+        # Age with context keyword
+        for match in self.patterns.AGE.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("AGE")))
         return positions
 
     def _redact_windows_paths(self, text: str) -> List[Tuple[int, int, str]]:
@@ -1807,7 +1875,8 @@ class PIRemover:
             # Reason: Aadhaar (12-digit), PAN (XXXXX0000X), SSN have very
             # specific formats with low false positive rates. Safe to run early.
             # -----------------------------------------------------------------
-            all_positions.extend(self._redact_government_ids(text))
+            if self.config.redact_government_ids:
+                all_positions.extend(self._redact_government_ids(text))
 
             # -----------------------------------------------------------------
             # LAYER 5: PHONE NUMBERS (High Specificity)
@@ -1865,10 +1934,17 @@ class PIRemover:
 
             # -----------------------------------------------------------------
             # LAYER 11: PAYMENT & FINANCIAL
-            # Reason: UPI IDs have specific format (xxx@upi). Lower priority
-            # as format is distinctive and won't overlap with other PI.
+            # Reason: Banking info, UPI IDs, credit cards, EPF/UAN, insurance.
+            # Run after government IDs (Aadhaar 12-digit may overlap with
+            # bank account numbers). Distinctive formats, low false positives.
             # -----------------------------------------------------------------
             all_positions.extend(self._redact_upi_ids(text))
+            if self.config.redact_banking:
+                all_positions.extend(self._redact_banking(text))
+            if self.config.redact_financial:
+                all_positions.extend(self._redact_financial(text))
+            if self.config.redact_dob:
+                all_positions.extend(self._redact_dob(text))
 
             # -----------------------------------------------------------------
             # LAYER 12: ACTIVE DIRECTORY (Contains Names + Employee IDs)
