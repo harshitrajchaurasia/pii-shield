@@ -351,9 +351,13 @@ class PIPatterns:
     # IDENTITY DOCUMENT PATTERNS
     # =========================================================================
 
-    # Aadhaar (12 digits)
+    # Aadhaar (12 digits, first digit 2-9 per UIDAI spec)
     AADHAAR = re.compile(
-        r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'
+        r'\b[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4}\b'
+    )
+    # Aadhaar with keyword context (any 12-digit number near an Aadhaar keyword)
+    AADHAAR_CONTEXTUAL = re.compile(
+        r'(?i)(?:aadhaa?r|uid(?:ai)?)\s*(?:no|number|num|#|:)?[\s.:_#-]*(\d{4}[\s-]?\d{4}[\s-]?\d{4})\b'
     )
     # PAN Card (case-insensitive)
     PAN = re.compile(
@@ -376,7 +380,10 @@ class PIPatterns:
     )
     # SSN with context keyword (allows no separator when keyword present)
     SSN_CONTEXTUAL = re.compile(
-        r'(?i)(?:ssn|social\s*security\s*(?:no|number|#)?)[\s.:_#-]*(\d{9})\b'
+        r'(?i)(?:ssn|social\s*security\s*(?:no|number|#)?'
+        r'|tax\s*(?:id|identification)\s*(?:no|number|#)?'
+        r'|taxpayer\s*(?:id|identification))'
+        r'[\s.:_#-]*(\d{3}[-\s]?\d{2}[-\s]?\d{4})\b'
     )
     # Driving License (Indian) - varies by state, case-insensitive
     DRIVING_LICENSE_IN = re.compile(
@@ -416,6 +423,12 @@ class PIPatterns:
     # Bank Account Number (Indian - 9 to 18 digits, requires context keyword)
     BANK_ACCOUNT_IN = re.compile(
         r'(?i)\b(?:a/?c|account|acct)[\s.:_-]*(?:no|number|num|#)?[\s.:_-]*(\d{9,18})\b'
+    )
+    # Bank Account with transaction context (transfer, deposit, send, pay, etc.)
+    BANK_ACCOUNT_CONTEXTUAL = re.compile(
+        r'(?i)(?:transfer(?:\s+to)?|deposit(?:\s+(?:to|into))?|credit(?:\s+to)?|debit(?:\s+from)?'
+        r'|send(?:\s+to)?|pay(?:\s+to)?|beneficiary|payee)'
+        r'[\s.:_#-]*(?:a/?c|account|acct)?[\s.:_#-]*(?:no|number|num|#)?[\s.:_#-]*(\d{9,18})\b'
     )
     # Bank Account with IFSC context (standalone long number near IFSC)
     BANK_ACCOUNT_STANDALONE = re.compile(

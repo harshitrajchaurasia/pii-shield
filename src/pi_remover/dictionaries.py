@@ -90,6 +90,41 @@ INDIAN_FIRST_NAMES: Set[str] = {
 
 
 # ============================================================================
+# International First Names (globally common, conservative set)
+# ============================================================================
+
+INTERNATIONAL_FIRST_NAMES: Set[str] = {
+    # English / Western
+    "adam", "alexander", "alice", "amanda", "andrew", "angela", "anna", "anthony",
+    "ashley", "benjamin", "betty", "brian", "carlos", "catherine", "charles",
+    "charlotte", "christina", "christopher", "daniel", "david", "deborah", "diana",
+    "donald", "dorothy", "edward", "elizabeth", "emily", "emma", "eric", "frank",
+    "george", "grace", "hannah", "helen", "henry", "isabella", "jack", "jacob",
+    "james", "jason", "jennifer", "jessica", "john", "jonathan", "joseph", "joshua",
+    "karen", "katherine", "kevin", "kimberly", "laura", "lauren", "linda", "lisa",
+    "margaret", "maria", "mark", "mary", "matthew", "megan", "melissa", "michael",
+    "michelle", "nancy", "nathan", "nicholas", "nicole", "olivia", "pamela",
+    "patricia", "patrick", "paul", "peter", "philip", "rachel", "raymond",
+    "rebecca", "richard", "robert", "ronald", "ruth", "ryan", "samantha", "samuel",
+    "sandra", "sarah", "scott", "sharon", "sophia", "stephanie", "stephen",
+    "steven", "susan", "thomas", "timothy", "victoria", "virginia", "william",
+    # Arabic / Middle Eastern
+    "ahmed", "ali", "fatima", "hassan", "hussein", "ibrahim", "khalid", "mohammed",
+    "omar", "yusuf", "zainab",
+    # East Asian (romanized)
+    "chen", "hao", "hui", "lei", "lin", "mei", "ming", "wei", "xin", "yan",
+    "yuki", "kenji", "haruki", "sakura",
+    # Spanish / Portuguese / Latin American
+    "alejandro", "ana", "antonio", "carmen", "diego", "elena", "fernando",
+    "francisco", "gabriela", "jose", "juan", "lucia", "luis", "miguel", "pablo",
+    "pedro", "rosa", "sofia",
+    # French / German / European
+    "andreas", "claude", "elena", "eva", "franz", "hans", "jean", "klaus",
+    "marie", "pierre", "sophie", "stefan", "wolfgang",
+}
+
+
+# ============================================================================
 # Common Indian Last Names / Surnames
 # ============================================================================
 

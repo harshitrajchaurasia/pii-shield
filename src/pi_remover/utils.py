@@ -431,6 +431,18 @@ class DataCleaner:
         if nfkc_normalize:
             result = unicodedata.normalize('NFKC', result)
 
+        # 1b. Homoglyph normalization — map Cyrillic/Greek lookalikes to ASCII
+        # Prevents bypass like: jоhn@cоmpany.cоm (Cyrillic о instead of Latin o)
+        _HOMOGLYPH_MAP = {
+            '\u0430': 'a', '\u0435': 'e', '\u043e': 'o', '\u0440': 'p',
+            '\u0441': 'c', '\u0443': 'y', '\u0445': 'x', '\u0456': 'i',
+            '\u0410': 'A', '\u0412': 'B', '\u0415': 'E', '\u041a': 'K',
+            '\u041c': 'M', '\u041d': 'H', '\u041e': 'O', '\u0420': 'P',
+            '\u0421': 'C', '\u0422': 'T', '\u0425': 'X',
+            '\u03bf': 'o', '\u03b1': 'a', '\u03b5': 'e',  # Greek
+        }
+        result = result.translate(str.maketrans(_HOMOGLYPH_MAP))
+
         # 2. Strip zero-width/invisible characters (v2.18.0)
         # Prevents PI obfuscation like: john​smith@email.com (zero-width space in middle)
         if strip_zero_width:

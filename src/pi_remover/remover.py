@@ -18,6 +18,7 @@ from .config import PIRemoverConfig
 from .patterns import PIPatterns
 from .dictionaries import (
     INDIAN_FIRST_NAMES, INDIAN_LAST_NAMES,
+    INTERNATIONAL_FIRST_NAMES,
     COMPANY_NAMES, INTERNAL_SYSTEMS
 )
 from .data_classes import Redaction, RedactionResult
@@ -50,7 +51,7 @@ class PIRemover:
 
         # Precompile name sets for faster lookup (with safe fallback)
         try:
-            self._first_names = {n.lower() for n in INDIAN_FIRST_NAMES}
+            self._first_names = {n.lower() for n in INDIAN_FIRST_NAMES} | {n.lower() for n in INTERNATIONAL_FIRST_NAMES}
             self._last_names = {n.lower() for n in INDIAN_LAST_NAMES}
             self._all_names = self._first_names | self._last_names
             self._companies = {c.lower() for c in COMPANY_NAMES}
@@ -69,6 +70,33 @@ class PIRemover:
         # Initialize NER if enabled
         if self.config.enable_ner and self.ner:
             self.ner.load()
+
+    # Verhoeff checksum tables for Aadhaar validation
+    _verhoeff_d = [
+        [0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],
+        [2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],
+        [4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],
+        [6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],
+        [8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0],
+    ]
+    _verhoeff_p = [
+        [0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],
+        [5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],
+        [9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],
+        [2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8],
+    ]
+    _verhoeff_inv = [0,4,3,2,1,5,6,7,8,9]
+
+    @classmethod
+    def _verify_aadhaar(cls, digits: str) -> bool:
+        """Validate Aadhaar number using Verhoeff checksum algorithm."""
+        try:
+            c = 0
+            for i, digit in enumerate(reversed(digits)):
+                c = cls._verhoeff_d[c][cls._verhoeff_p[i % 8][int(digit)]]
+            return c == 0
+        except (ValueError, IndexError):
+            return False
 
     def _load_external_names(self, names_file: Optional[str] = None) -> int:
         """Load additional names from external dictionary file (v2.5)."""
@@ -235,7 +263,23 @@ class PIRemover:
         for match in self.patterns.NAME_AFTER_TOKEN.finditer(text):
             if match.group(1):
                 cleanup_positions.append((match.start(1), match.end(1), self._get_token("NAME")))
-        
+
+        # Pattern 3: [NAME] followed by adjacent known name (partial redaction cleanup)
+        # Matches: "[NAME] Kumar", "[NAME] Singh" where last name was missed
+        adjacent_name_re = re.compile(r'\[NAME\]\s+([A-Z][a-z]{1,20})\b')
+        for match in adjacent_name_re.finditer(text):
+            word = match.group(1).lower()
+            if word in self._all_names:
+                cleanup_positions.append((match.start(1), match.end(1), self._get_token("NAME")))
+
+        # Pattern 4: Email fragment left after name redaction
+        # Matches: "[NAME].smith@corp.com", "[EMP_ID]_user@company.org"
+        email_fragment_re = re.compile(
+            r'\[(?:NAME|EMP_ID)\][._]?([a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+        )
+        for match in email_fragment_re.finditer(text):
+            cleanup_positions.append((match.start(1), match.end(1), self._get_token("EMAIL")))
+
         # Remove overlaps and apply
         if cleanup_positions:
             cleanup_positions = self._remove_overlaps(cleanup_positions)
@@ -807,7 +851,19 @@ class PIRemover:
     def _redact_government_ids(self, text: str) -> List[Tuple[int, int, str]]:
         """Detect and mark government IDs (Aadhaar, PAN, Passport, SSN, DL, Voter ID, NIN)."""
         positions = []
-        positions.extend(self._find_pattern_matches(text, self.patterns.AADHAAR, "AADHAAR"))
+        # Aadhaar: strict pattern (first digit 2-9) with Verhoeff checksum or keyword context
+        for match in self.patterns.AADHAAR.finditer(text):
+            candidate = re.sub(r'[\s-]', '', match.group())
+            if self._verify_aadhaar(candidate):
+                positions.append((match.start(), match.end(), self._get_token("AADHAAR")))
+            else:
+                # Accept without checksum if keyword nearby (within 50 chars before)
+                prefix = text[max(0, match.start() - 50):match.start()].lower()
+                if any(kw in prefix for kw in ('aadhaar', 'aadhar', 'uid', 'uidai')):
+                    positions.append((match.start(), match.end(), self._get_token("AADHAAR")))
+        # Aadhaar contextual: keyword + any 12-digit number (catches numbers starting with 0/1)
+        for match in self.patterns.AADHAAR_CONTEXTUAL.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("AADHAAR")))
         positions.extend(self._find_pattern_matches(text, self.patterns.PAN, "PAN"))
         positions.extend(self._find_pattern_matches(text, self.patterns.PASSPORT, "PASSPORT"))
         # Credit card moved to _redact_financial()
@@ -831,6 +887,9 @@ class PIRemover:
         positions = []
         # Bank account with explicit keyword (a/c, account)
         for match in self.patterns.BANK_ACCOUNT_IN.finditer(text):
+            positions.append((match.start(), match.end(), self._get_token("BANK_ACCOUNT", "IN")))
+        # Bank account with transaction context (transfer to, deposit into, etc.)
+        for match in self.patterns.BANK_ACCOUNT_CONTEXTUAL.finditer(text):
             positions.append((match.start(), match.end(), self._get_token("BANK_ACCOUNT", "IN")))
         # IFSC Code (always redact - format is distinctive: 4 letters + 0 + 6 chars)
         positions.extend(self._find_pattern_matches(text, self.patterns.IFSC, "IFSC"))
@@ -1521,6 +1580,20 @@ class PIRemover:
             parts = potential_name.lower().split()
             if any(part in self._all_names for part in parts) and len(parts) >= 2:
                 positions.append((match.start(), match.end(), self._get_token("NAME")))
+
+        # v2.20: Single-word known name after strong context prefix (conservative)
+        strong_prefixes = {
+            'dear', 'hello', 'hi', 'hey', 'mr', 'mrs', 'ms', 'dr', 'prof',
+            'contact', 'call', 'email', 'notify', 'attn', 'cc',
+        }
+        single_name_re = re.compile(
+            r'\b(' + '|'.join(re.escape(p) for p in strong_prefixes) + r')[\s,.]+([A-Z][a-z]+)\b',
+            re.IGNORECASE
+        )
+        for match in single_name_re.finditer(text):
+            name = match.group(2).lower()
+            if name in self._all_names and name not in false_positive_singles:
+                positions.append((match.start(2), match.end(2), self._get_token("NAME")))
 
         return positions
 
