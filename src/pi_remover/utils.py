@@ -190,8 +190,9 @@ def get_cpu_count() -> int:
     
     # Try os.cpu_count() as backup
     try:
-        count = os.cpu_count()
-        if count and count > 0:
+        os_count = os.cpu_count()
+        if os_count and os_count > 0:
+            count = os_count
             return count
     except Exception:
         pass
@@ -441,7 +442,7 @@ class DataCleaner:
             '\u0421': 'C', '\u0422': 'T', '\u0425': 'X',
             '\u03bf': 'o', '\u03b1': 'a', '\u03b5': 'e',  # Greek
         }
-        result = result.translate(str.maketrans(_HOMOGLYPH_MAP))
+        result = result.translate(str.maketrans(_HOMOGLYPH_MAP))  # type: ignore[arg-type]
 
         # 2. Strip zero-width/invisible characters (v2.18.0)
         # Prevents PI obfuscation like: john​smith@email.com (zero-width space in middle)
@@ -508,7 +509,6 @@ class DataCleaner:
             'â€™': "'",
             'â€œ': '"',
             'â€': '"',
-            'â€"': '-',
             'â€"': '-',
             'Ã©': 'é',
             'Ã¨': 'è',

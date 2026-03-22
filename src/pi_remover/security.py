@@ -467,7 +467,7 @@ def decode_jwt_token(token: str) -> Optional[Dict[str, Any]]:
         if padding != 4:
             payload_b64 += '=' * padding
         
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        payload: dict[str, Any] = json.loads(base64.urlsafe_b64decode(payload_b64))
         return payload
         
     except Exception:
@@ -732,7 +732,7 @@ class FileSecurityValidator:
                         if not matched:
                             security_logger.warning(
                                 f"Magic byte mismatch for {original_filename}: "
-                                f"expected one of {valid_magics}, got {magic[:4]}"
+                                f"expected one of {valid_magics}, got {magic[:4]!r}"
                             )
                             return False, "File content does not match extension"
             except Exception as e:

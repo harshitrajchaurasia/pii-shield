@@ -42,11 +42,11 @@ logger = logging.getLogger("pi_remover")
 # Optional Imports
 # Security validation (optional - for file processing)
 try:
-    from pi_remover.security import validate_file_security, SecurityConfig
+    from pi_remover.security import validate_file_security
     SECURITY_AVAILABLE = True
 except ImportError:
     SECURITY_AVAILABLE = False
-    def validate_file_security(path: str, strict: bool = True) -> Tuple[bool, Optional[str]]:
+    def validate_file_security(path: str, strict: bool = True) -> Tuple[bool, Optional[str]]:  # type: ignore[misc]
         return True, None  # No-op if security module not available
 
 # Resource monitoring for auto-scaling (optional)
@@ -198,6 +198,7 @@ def _process_chunk_worker(chunk_data: Tuple[int, pd.DataFrame, List[str]]) -> pd
     idx, chunk, columns = chunk_data
 
     # Use safe per-row application to avoid single-row failures
+    assert _worker_remover is not None, "Worker remover not initialized"
     for col in columns:
         if col in chunk.columns:
             try:

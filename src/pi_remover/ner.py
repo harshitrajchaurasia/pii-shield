@@ -146,6 +146,7 @@ class SpacyNER:
             entity_types = ["PERSON", "ORG", "GPE", "LOC"]
 
         try:
+            assert self.nlp is not None
             doc = self.nlp(text)
             entities = []
             for ent in doc.ents:
