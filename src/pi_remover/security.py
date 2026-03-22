@@ -32,8 +32,10 @@ class SecurityConfig:
     """Security settings."""
     
     # =========================================================================
-    # HARDCODED CREDENTIALS (for development and testing)
+    # CREDENTIAL PLACEHOLDERS (must be overridden via env vars in production)
     # =========================================================================
+    _PLACEHOLDER_SECRET = "YOUR_DEV_JWT_SECRET_HERE"
+    
     # DEV Environment
     DEV_JWT_SECRET = "YOUR_DEV_JWT_SECRET_HERE"
     DEV_CLIENT_ID = "pi-dev-client"
@@ -47,6 +49,15 @@ class SecurityConfig:
     # Test Client (for running tests)
     TEST_CLIENT_ID = "pi-test-client"
     TEST_CLIENT_SECRET = "TestClientSecret1234567890ABCDEF"
+    
+    # Known placeholder values that MUST be replaced in production
+    _PLACEHOLDER_SECRETS = {
+        "YOUR_DEV_JWT_SECRET_HERE",
+        "YOUR_DEV_CLIENT_SECRET_HERE",
+        "YOUR_PROD_JWT_SECRET_HERE",
+        "YOUR_PROD_CLIENT_SECRET_HERE",
+        "YOUR_WEB_CLIENT_SECRET_HERE",
+    }
     
     # JWT Token Authentication (always enabled - cannot be disabled)
     # Uses environment variable if set, otherwise falls back to DEV secret
@@ -118,8 +129,8 @@ class SecurityConfig:
         "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
         "Content-Security-Policy": (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https://fastapi.tiangolo.com;"
         ),
@@ -245,6 +256,24 @@ class SecurityConfig:
                 f"Using hardcoded credentials for {environment} environment.\n"
                 f"  Available clients: {list(cls.CLIENTS.keys())}"
             )
+        
+        # C1 FIX: Fail fast if placeholder secrets are used in production
+        environment = os.environ.get("ENVIRONMENT", "development")
+        if environment == "production":
+            # Check JWT secret
+            if cls.JWT_SECRET_KEY in cls._PLACEHOLDER_SECRETS:
+                raise RuntimeError(
+                    "SECURITY ERROR: JWT_SECRET_KEY is a placeholder value in production! "
+                    "Set the JWT_SECRET_KEY environment variable to a strong random secret."
+                )
+            # Check client secrets
+            for client_id, client_data in cls.CLIENTS.items():
+                secret = client_data.get("secret", "")
+                if secret in cls._PLACEHOLDER_SECRETS:
+                    raise RuntimeError(
+                        f"SECURITY ERROR: Client '{client_id}' has a placeholder secret in production! "
+                        f"Configure proper secrets via AUTH_CLIENTS env var or clients.yaml."
+                    )
 
 
 # Initialize configuration
@@ -509,6 +538,30 @@ def generate_auth_token(client_id: str, client_secret: str) -> Optional[TokenRes
     )
 
 
+# H3: In-memory token blacklist (use Redis for horizontal scaling)
+_revoked_tokens: Dict[str, float] = {}  # jti -> expiry timestamp
+_REVOKED_CLEANUP_INTERVAL = 300  # Clean expired entries every 5 min
+_last_revoked_cleanup = time.time()
+
+
+def revoke_token(jti: str, exp: float) -> None:
+    """Add a token JTI to the revocation blacklist."""
+    global _last_revoked_cleanup
+    _revoked_tokens[jti] = exp
+    # Periodically clean expired entries to prevent unbounded growth
+    now = time.time()
+    if now - _last_revoked_cleanup > _REVOKED_CLEANUP_INTERVAL:
+        _last_revoked_cleanup = now
+        expired = [k for k, v in _revoked_tokens.items() if v < now]
+        for k in expired:
+            del _revoked_tokens[k]
+
+
+def is_token_revoked(jti: str) -> bool:
+    """Check if a token has been revoked."""
+    return jti in _revoked_tokens
+
+
 async def verify_bearer_token(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)
@@ -549,6 +602,18 @@ async def verify_bearer_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired. Please obtain a new token.",
             headers={"WWW-Authenticate": "Bearer error=\"token_expired\""}
+        )
+    
+    # H3: Check if token has been revoked
+    jti = payload.get("jti")
+    if jti and is_token_revoked(jti):
+        security_logger.warning(
+            f"Revoked token used | Client: {payload.get('client_id')} | IP: {get_client_ip(request)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked.",
+            headers={"WWW-Authenticate": "Bearer error=\"token_revoked\""}
         )
     
     # Get client rate limit

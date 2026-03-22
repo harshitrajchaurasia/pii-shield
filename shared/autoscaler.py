@@ -100,7 +100,7 @@ class AutoscalerConfig:
     
     # Worker limits
     min_workers: int = 1
-    max_workers: int = field(default_factory=lambda: os.cpu_count() or 4)
+    max_workers: int = field(default_factory=lambda: min(os.cpu_count() or 4, 32))
     
     # Thresholds
     scale_up_threshold: int = 10   # Queue depth to trigger scale up

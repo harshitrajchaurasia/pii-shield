@@ -104,7 +104,7 @@ try {
     
     # Basic validation of env file
     $envContent = Get-Content $EnvFile -Raw
-    if ($envContent -match "REPLACE_WITH") {
+    if ($envContent -match "REPLACE_WITH|YOUR_.*SECRET|YOUR_.*KEY") {
         Write-Host ""
         Write-Host "╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Red
         Write-Host "║                 UNCONFIGURED SECRETS DETECTED                 ║" -ForegroundColor Red

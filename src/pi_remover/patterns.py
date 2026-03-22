@@ -27,18 +27,46 @@ Usage:
 """
 
 import re
+import logging
 from typing import Set
+
+logger = logging.getLogger(__name__)
 
 
 class PIPatterns:
     """Compiled regex patterns for PI detection."""
 
+    @classmethod
+    def validate_patterns(cls) -> list:
+        """
+        Validate all class-level regex patterns compile and can match.
+        Returns list of invalid pattern names (empty = all valid).
+        """
+        invalid = []
+        for attr_name in dir(cls):
+            if not attr_name.isupper() or attr_name.startswith('_'):
+                continue
+            pattern = getattr(cls, attr_name, None)
+            if isinstance(pattern, re.Pattern):
+                try:
+                    pattern.search("")
+                except re.error as e:
+                    invalid.append(attr_name)
+                    logger.error(f"Invalid regex pattern {attr_name}: {e}")
+        if invalid:
+            logger.error(f"Found {len(invalid)} invalid patterns: {invalid}")
+        else:
+            logger.debug(f"All regex patterns validated successfully")
+        return invalid
+
     # =========================================================================
     # EMAIL PATTERNS
     # =========================================================================
 
+    # C11: Tightened email regex - requires local part to start with alphanumeric,
+    # limits local part length to 64 chars, and requires known TLD length (2-20)
     EMAIL = re.compile(
-        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b',
+        r'\b[A-Za-z0-9][A-Za-z0-9._%+-]{0,63}@[A-Za-z0-9](?:[A-Za-z0-9.-]{0,61}[A-Za-z0-9])?\.[A-Za-z]{2,20}\b',
         re.IGNORECASE
     )
 
@@ -531,11 +559,15 @@ class PIPatterns:
 
     # Contextual name patterns - names preceded by clear indicators (HIGH CONFIDENCE)
     # NOTE: Do NOT include standalone "to" - too many false positives
+    # ReDoS safety: Alternations grouped by common prefix to reduce backtracking.
+    # Capture group bounded by {0,2} repetition. No nested quantifiers.
     NAME_CONTEXT_FROM_BY = re.compile(
-        r'(?i)\b(?:from|by|cc|bcc|sent by|sent to|created by|assigned to|resolved by|'
-        r'updated by|approved by|rejected by|forwarded by|forwarded to|replied by|'
-        r'escalated to|transferred to|delegated to|reported by|submitted by|'
-        r'delivered to|addressed to|directed to|email to|emailed to|message to)'
+        r'(?i)\b(?:from|by|cc|bcc'
+        r'|sent (?:by|to)|created by|assigned to|resolved by'
+        r'|(?:updated|approved|rejected|replied|reported|submitted) by'
+        r'|forwarded (?:by|to)|escalated to|transferred to|delegated to'
+        r'|delivered to|addressed to|directed to'
+        r'|(?:email|emailed|message) to)'
         r'[\s:]+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})'
     )
 
@@ -600,11 +632,13 @@ class PIPatterns:
     )
 
     # Signature block patterns
+    # ReDoS safety: Trailing match bounded to 200 chars via [^\n]{0,200}.
+    # Inner \s* quantifiers are safe (single-char class, no nesting).
     SIGNATURE_START = re.compile(
-        r'(?i)\b(?:thanks?(?:\s*(?:and|&)\s*regards?)?|'
-        r'thank\s*you|regards?|best(?:\s*regards?)?|'
-        r'warm(?:\s*regards?)?|sincerely|cheers)\b.*',
-        re.DOTALL
+        r'(?i)\b(?:thanks?(?:\s{0,5}(?:and|&)\s{0,5}regards?)?|'
+        r'thank\s{0,5}you|regards?|best(?:\s{0,5}regards?)?|'
+        r'warm(?:\s{0,5}regards?)?|sincerely|cheers)\b[^\n]{0,200}',
+        re.MULTILINE
     )
 
     # =========================================================================

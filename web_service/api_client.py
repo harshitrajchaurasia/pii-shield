@@ -33,6 +33,7 @@ import time
 import asyncio
 import logging
 import secrets
+import random
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -418,6 +419,8 @@ class PIRemoverAPIClient:
         full_path = f"{self._api_prefix}{path}"
         
         last_error = None
+        _token_refresh_attempts = 0
+        _max_token_refreshes = 2  # Prevent infinite token refresh loops
         
         for attempt in range(self.config.max_retries + 1):
             try:
@@ -430,6 +433,9 @@ class PIRemoverAPIClient:
                 
                 # Handle token expiry
                 if response.status_code == 401:
+                    _token_refresh_attempts += 1
+                    if _token_refresh_attempts > _max_token_refreshes:
+                        raise APIClientError("Token refresh failed after max attempts")
                     # Token expired, refresh and retry
                     self._access_token = None
                     token = await self._ensure_token()
@@ -470,7 +476,7 @@ class PIRemoverAPIClient:
                 )
                 self._circuit_breaker.record_failure()
             
-            # Exponential backoff
+            # Exponential backoff with jitter (H17 fix)
             if attempt < self.config.max_retries:
                 delay = min(
                     self.config.retry_delay_seconds * (
@@ -478,6 +484,9 @@ class PIRemoverAPIClient:
                     ),
                     self.config.retry_max_delay_seconds
                 )
+                # Add random jitter (±25%) to prevent thundering herd
+                jitter = delay * random.uniform(-0.25, 0.25)
+                delay = max(0.1, delay + jitter)
                 logger.debug(f"Retrying in {delay:.1f}s")
                 await asyncio.sleep(delay)
         
