@@ -62,7 +62,7 @@ jobs:
             --max-instances 1 \
             --min-instances 0 \
             --allow-unauthenticated \
-            --set-env-vars "STANDALONE_MODE=true,ENVIRONMENT=production,LOG_LEVEL=WARNING" \
+            --set-env-vars "STANDALONE_MODE=true,ENVIRONMENT=production,LOG_LEVEL=WARNING,GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" \
             --quiet
 
       - name: Show deployment URL

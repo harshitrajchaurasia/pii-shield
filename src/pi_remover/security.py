@@ -1,6 +1,6 @@
 """
 Security module - handles auth, rate limiting, input validation, etc.
-Version: 2.5.0
+Version: 2.6.0
 """
 
 import os
@@ -24,6 +24,84 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
+
+
+# --- Secret Resolution ---
+
+def _get_secret_manager_client():
+    """Lazily initialize GCP Secret Manager client. Returns None if unavailable."""
+    try:
+        from google.cloud import secretmanager
+        return secretmanager.SecretManagerServiceClient()
+    except ImportError:
+        return None
+    except Exception as e:
+        logging.debug(f"Secret Manager client init failed: {e}")
+        return None
+
+_sm_client = None
+_sm_client_initialized = False
+
+
+def get_secret(name: str, default: str = "") -> str:
+    """Resolve a secret value using priority: env var → GCP Secret Manager → default.
+
+    Environment variables:
+        - Direct: e.g. JWT_SECRET_KEY=mysecret
+        - SM reference: e.g. JWT_SECRET_KEY=sm://projects/my-proj/secrets/jwt-key/versions/latest
+
+    GCP Secret Manager:
+        - Auto-detected via GCP_PROJECT_ID env var + secret name convention
+        - Or explicit sm:// URI in env var
+
+    Args:
+        name: Secret name (used as env var name and SM secret name)
+        default: Fallback value if secret not found anywhere
+    """
+    # 1. Check environment variable
+    env_value = os.environ.get(name, "")
+    if env_value:
+        # Support sm:// URI syntax for explicit Secret Manager references
+        if env_value.startswith("sm://"):
+            resolved = _resolve_sm_uri(env_value[5:])
+            if resolved is not None:
+                return resolved
+            logging.warning(f"Failed to resolve Secret Manager URI for {name}, using default")
+            return default
+        return env_value
+
+    # 2. Try GCP Secret Manager auto-lookup
+    project_id = os.environ.get("GCP_PROJECT_ID", "")
+    if project_id:
+        resolved = _resolve_sm_secret(project_id, name)
+        if resolved is not None:
+            return resolved
+
+    return default
+
+
+def _resolve_sm_uri(resource_name: str) -> Optional[str]:
+    """Resolve a Secret Manager resource name like projects/X/secrets/Y/versions/Z."""
+    global _sm_client, _sm_client_initialized
+    if not _sm_client_initialized:
+        _sm_client = _get_secret_manager_client()
+        _sm_client_initialized = True
+    if _sm_client is None:
+        return None
+    try:
+        response = _sm_client.access_secret_version(request={"name": resource_name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        logging.debug(f"Secret Manager access failed for {resource_name}: {e}")
+        return None
+
+
+def _resolve_sm_secret(project_id: str, secret_id: str) -> Optional[str]:
+    """Try to fetch a secret from GCP Secret Manager by project + name."""
+    # Convert env var name to SM convention: JWT_SECRET_KEY -> jwt-secret-key
+    sm_name = secret_id.lower().replace("_", "-")
+    resource = f"projects/{project_id}/secrets/{sm_name}/versions/latest"
+    return _resolve_sm_uri(resource)
 
 
 # --- Config ---
@@ -60,10 +138,10 @@ class SecurityConfig:
     }
     
     # JWT Token Authentication (always enabled - cannot be disabled)
-    # Uses environment variable if set, otherwise falls back to DEV secret
-    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", DEV_JWT_SECRET)
+    # Resolution order: env var → GCP Secret Manager → dev default
+    JWT_SECRET_KEY = get_secret("JWT_SECRET_KEY", DEV_JWT_SECRET)
     JWT_ALGORITHM = "HS256"
-    JWT_EXPIRY_MINUTES = int(os.environ.get("JWT_EXPIRY_MINUTES", "30"))  # 30 minutes
+    JWT_EXPIRY_MINUTES = int(get_secret("JWT_EXPIRY_MINUTES", "30"))  # 30 minutes
     
     # Client Credentials (for obtaining tokens)
     # Format: {"client_id": {"secret": "...", "name": "...", "rate_limit": 100}}
@@ -160,11 +238,27 @@ class SecurityConfig:
     
     @classmethod
     def load_clients(cls):
-        """Load client credentials from environment, YAML config, or secrets file."""
+        """Load client credentials from Secret Manager, environment, YAML, or defaults.
+
+        Resolution priority:
+          1. GCP Secret Manager (via get_secret / sm:// URIs)
+          2. Environment variables (AUTH_CLIENTS, JWT_SECRET_KEY)
+          3. YAML config files (config/clients.yaml)
+          4. JSON secrets file (legacy)
+          5. Hardcoded defaults (dev only)
+        """
         import yaml  # Local import to avoid circular dependencies
-        
+
+        # Re-resolve JWT secret (may have been set after class init)
+        resolved_jwt = get_secret("JWT_SECRET_KEY", cls.DEV_JWT_SECRET)
+        if resolved_jwt != cls.DEV_JWT_SECRET:
+            cls.JWT_SECRET_KEY = resolved_jwt
+
         # Load from environment (comma-separated client_id:client_secret:name)
         clients_env = os.environ.get("AUTH_CLIENTS", "")
+        if not clients_env:
+            # Try Secret Manager for AUTH_CLIENTS
+            clients_env = get_secret("AUTH_CLIENTS", "")
         if clients_env:
             for entry in clients_env.split(","):
                 parts = entry.split(":")
@@ -258,22 +352,32 @@ class SecurityConfig:
             )
         
         # C1 FIX: Fail fast if placeholder secrets are used in production
+        # In standalone mode (web UI only, no API auth), downgrade to warning
         environment = os.environ.get("ENVIRONMENT", "development")
+        standalone = os.environ.get("STANDALONE_MODE", "false").lower() in ("true", "1", "yes")
         if environment == "production":
             # Check JWT secret
             if cls.JWT_SECRET_KEY in cls._PLACEHOLDER_SECRETS:
-                raise RuntimeError(
-                    "SECURITY ERROR: JWT_SECRET_KEY is a placeholder value in production! "
+                msg = (
+                    "SECURITY: JWT_SECRET_KEY is a placeholder value in production! "
                     "Set the JWT_SECRET_KEY environment variable to a strong random secret."
                 )
+                if standalone:
+                    logging.warning(msg + " (Standalone mode — JWT auth not used, continuing.)")
+                else:
+                    raise RuntimeError("SECURITY ERROR: " + msg)
             # Check client secrets
             for client_id, client_data in cls.CLIENTS.items():
                 secret = client_data.get("secret", "")
                 if secret in cls._PLACEHOLDER_SECRETS:
-                    raise RuntimeError(
-                        f"SECURITY ERROR: Client '{client_id}' has a placeholder secret in production! "
+                    msg = (
+                        f"SECURITY: Client '{client_id}' has a placeholder secret in production! "
                         f"Configure proper secrets via AUTH_CLIENTS env var or clients.yaml."
                     )
+                    if standalone:
+                        logging.warning(msg + " (Standalone mode — continuing.)")
+                    else:
+                        raise RuntimeError("SECURITY ERROR: " + msg)
 
 
 # Initialize configuration
