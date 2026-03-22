@@ -1105,7 +1105,7 @@
     <main class="main">
         <div class="page-header">
             <h1>Context-Aware PII Shield</h1>
-            <p>Protect your personal data before sharing prompts with ChatGPT, Claude, Gemini, or any AI.</p>
+            <p>Protect your personal data before sharing prompts with any AI chatbot.</p>
         </div>
 
         <div class="content-grid">
@@ -1658,7 +1658,7 @@
                         range.selectNodeContents(document.getElementById('output-text'));
                         window.getSelection().removeAllRanges();
                         window.getSelection().addRange(range);
-                        showToast('Text selected — press Ctrl+C to copy', 'warning');
+                        showToast('Text selected - press Ctrl+C to copy', 'warning');
                     });
             } else {
                 const ta = document.createElement('textarea');
@@ -1681,10 +1681,10 @@
                     document.getElementById('input-text').dispatchEvent(new Event('input'));
                     showToast('Pasted from clipboard');
                 } else {
-                    showToast('Clipboard access not available — use Ctrl+V', 'warning');
+                    showToast('Clipboard access not available - use Ctrl+V', 'warning');
                 }
             } catch (e) {
-                showToast('Clipboard access denied — use Ctrl+V instead', 'warning');
+                showToast('Clipboard access denied - use Ctrl+V instead', 'warning');
             }
         }
 

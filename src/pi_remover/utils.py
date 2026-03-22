@@ -432,7 +432,7 @@ class DataCleaner:
         if nfkc_normalize:
             result = unicodedata.normalize('NFKC', result)
 
-        # 1b. Homoglyph normalization — map Cyrillic/Greek lookalikes to ASCII
+        # 1b. Homoglyph normalization - map Cyrillic/Greek lookalikes to ASCII
         # Prevents bypass like: jоhn@cоmpany.cоm (Cyrillic о instead of Latin o)
         _HOMOGLYPH_MAP = {
             '\u0430': 'a', '\u0435': 'e', '\u043e': 'o', '\u0440': 'p',

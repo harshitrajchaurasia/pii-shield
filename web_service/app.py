@@ -511,7 +511,7 @@ async def get_api_client() -> PIRemoverAPIClient:
                 client_secret = "YOUR_WEB_CLIENT_SECRET_HERE"
                 logger.warning(
                     f"Client secret not found in env/config for {client_id}, "
-                    "using dev fallback — NOT SAFE FOR PRODUCTION"
+                    "using dev fallback - NOT SAFE FOR PRODUCTION"
                 )
             
             _api_client = PIRemoverAPIClient(
@@ -1404,7 +1404,7 @@ async def health_check():
 
 @app.get("/ready")
 async def readiness_check():
-    """Readiness probe — returns 200 only when PIRemover is fully initialized."""
+    """Readiness probe - returns 200 only when PIRemover is fully initialized."""
     try:
         remover = _get_remover(fast_mode=True)
         if remover is None:
