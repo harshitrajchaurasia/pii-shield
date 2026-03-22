@@ -710,7 +710,7 @@ class TestGeneralPublicPIIScenario:
     """End-to-end test for the general public use case."""
 
     def test_bank_complaint_letter(self, remover):
-        """The user's original example — bank complaint with multiple PI types."""
+        """The user's original example - bank complaint with multiple PI types."""
         text = (
             "Help me write a complaint letter to my bank. "
             "My name is Rajesh Kumar, Aadhaar: 1234 5678 9012, "
@@ -783,7 +783,7 @@ class TestPhase2Improvements:
 
     def test_email_fragment_after_name_redaction(self, remover):
         """Email fragment left after name redaction should be cleaned up."""
-        # This tests the cleanup pass — if name "john" gets redacted but ".smith@corp.com" remains
+        # This tests the cleanup pass - if name "john" gets redacted but ".smith@corp.com" remains
         result = remover.redact("Contact john.smith@corp.com for details")
         assert "@corp.com" not in result
         assert "[EMAIL]" in result

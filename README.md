@@ -1,43 +1,43 @@
-# PII Shield — Context-Aware Personal Data Protection
+# PII Shield - Context-Aware Personal Data Protection
 
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![PII Types](https://img.shields.io/badge/PII_types-35+-orange)
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen?logo=googlecloud)](https://pii-shield-49982461185.us-central1.run.app)
 
-**Context-aware PII detection — stop leaking personal data to LLMs.**
+**Context-aware PII detection - stop leaking personal data to LLMs.**
 
-When you ask ChatGPT to "review my resume" or "draft a complaint letter," your name, phone number, Aadhaar, PAN, and other personal details get sent to external servers. PII Shield sits between you and the AI — it detects and replaces personal information with safe tokens, so the AI still understands your request without ever seeing your real data.
+When you ask ChatGPT to "review my resume" or "draft a complaint letter," your name, phone number, Aadhaar, PAN, and other personal details get sent to external servers. PII Shield sits between you and the AI - it detects and replaces personal information with safe tokens, so the AI still understands your request without ever seeing your real data.
 
 ```
  Your Prompt                          Safe Prompt                        AI Response
  ┌──────────────────────┐     ┌────────────────────────────┐     ┌──────────────────┐
  │ "Draft a complaint   │     │ "Draft a complaint         │     │                  │
- │  for Rajesh Kumar,   │ ──> │  for [NAME],               │ ──> │  ChatGPT/Claude  │
+ │  for Rajesh Kumar,   │ ──> │  for [NAME],               │ ──> │  LLM responds    │
  │  rajesh@gmail.com,   │     │  [EMAIL],                  │     │  responds safely │
  │  Aadhaar 1234 5678"  │     │  Aadhaar [AADHAAR]"        │     │                  │
  └──────────────────────┘     └────────────────────────────┘     └──────────────────┘
                                       PII Shield
 ```
 
-> **[Live Demo](https://pii-shield-49982461185.us-central1.run.app)** — try it in your browser
+> **[Live Demo](https://pii-shield-49982461185.us-central1.run.app)** - try it in your browser
 
 ## Why PII Shield?
 
 - You paste a prompt containing your **name, email, phone, Aadhaar, PAN, credit card number**
-- That data travels to OpenAI/Google/Anthropic servers
+- That data travels to third-party servers
 - It may be logged, cached, or used for training
-- **PII Shield strips it out first** — the AI gets `[NAME]`, `[EMAIL]`, `[AADHAAR]` instead
+- **PII Shield strips it out first** - the AI gets `[NAME]`, `[EMAIL]`, `[AADHAAR]` instead
 
 ## Features
 
-- **35+ PII types** — names, emails, phones, Aadhaar, PAN, SSN, passport, credit cards, DOB, bank accounts, UPI, and more
-- **Context-aware detection** — understands surrounding keywords like "transfer to", "Dear", "password:" to catch PII that simple regex misses
-- **Web UI** — paste text or drag-and-drop files (CSV, Excel, JSON, DOCX, PDF)
-- **Instant results** — regex + dictionary detection, no external API calls
-- **Dark/light theme** — clean, modern interface
-- **Zero data retention** — nothing stored, nothing logged, runs locally or self-hosted
-- **Open source** — MIT licensed, free forever
+- **35+ PII types** - names, emails, phones, Aadhaar, PAN, SSN, passport, credit cards, DOB, bank accounts, UPI, and more
+- **Context-aware detection** - understands surrounding keywords like "transfer to", "Dear", "password:" to catch PII that simple regex misses
+- **Web UI** - paste text or drag-and-drop files (CSV, Excel, JSON, DOCX, PDF)
+- **Instant results** - regex + dictionary detection, no external API calls
+- **Dark/light theme** - clean, modern interface
+- **Zero data retention** - nothing stored, nothing logged, runs locally or self-hosted
+- **Open source** - MIT licensed, free forever
 
 ## Quick Start
 
@@ -58,7 +58,7 @@ Open [http://localhost:8082](http://localhost:8082) in your browser.
 **Safe prompt (sent to AI):**
 > Help me write a complaint letter to my bank. My name is [NAME], email [EMAIL], phone [PHONE]. My Aadhaar is [AADHAAR], PAN: [PAN]. Account number [BANK_ACCT].
 
-The AI writes the letter perfectly — using placeholders you can swap back in later.
+The AI writes the letter perfectly - using placeholders you can swap back in later.
 
 ## PII Types Detected
 
@@ -80,7 +80,7 @@ The AI writes the letter perfectly — using placeholders you can swap back in l
 └─────────────┘     └──────────────────────────────────────┘
 ```
 
-All processing happens locally — your data never leaves the server.
+All processing happens locally - your data never leaves the server.
 
 ## Python Library
 
@@ -100,4 +100,4 @@ Python 3.11+ | FastAPI | Pandas | Pydantic | spaCy NER (optional)
 
 ## License
 
-MIT — free for personal and commercial use.
+MIT - free for personal and commercial use.
