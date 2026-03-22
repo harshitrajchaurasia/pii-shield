@@ -135,6 +135,27 @@
             inputCounter.style.color = len > 90000 ? '#e74c3c' : 'var(--text-secondary)';
         });
 
+        // Button event bindings (CSP-compliant, no inline handlers)
+        document.getElementById('paste-btn').addEventListener('click', () => pasteFromClipboard());
+        document.querySelectorAll('[data-example]').forEach(btn => {
+            btn.addEventListener('click', () => loadExample(parseInt(btn.dataset.example)));
+        });
+        document.getElementById('redact-btn').addEventListener('click', () => redactText());
+
+        const resetFileBtn = document.getElementById('reset-file-btn');
+        if (resetFileBtn) resetFileBtn.addEventListener('click', () => resetFileUpload());
+        const processBtn = document.getElementById('process-btn');
+        if (processBtn) processBtn.addEventListener('click', () => processFile());
+        const downloadResultBtn = document.getElementById('download-result-btn');
+        if (downloadResultBtn) downloadResultBtn.addEventListener('click', () => downloadResult());
+        const processAnotherBtn = document.getElementById('process-another-btn');
+        if (processAnotherBtn) processAnotherBtn.addEventListener('click', () => resetFileUpload());
+
+        const copyResultBtn = document.getElementById('copy-result-btn');
+        if (copyResultBtn) copyResultBtn.addEventListener('click', () => copyResult());
+        const downloadTxtBtn = document.getElementById('download-txt-btn');
+        if (downloadTxtBtn) downloadTxtBtn.addEventListener('click', () => downloadResultAsTxt());
+
         let currentJobId = null;
         let selectedColumns = [];
         let statusPollInterval = null;
@@ -148,12 +169,13 @@
                     ${type === 'success' ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>' : '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'}
                 </svg>
                 <span class="toast-msg"></span>
-                <button class="toast-close" onclick="this.parentElement.remove()">
+                <button class="toast-close">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             `;
             // Use textContent for user message to prevent XSS
             toast.querySelector('.toast-msg').textContent = message;
+            toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
             container.appendChild(toast);
             setTimeout(() => toast.remove(), 5000);
         }
