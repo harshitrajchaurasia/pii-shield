@@ -2160,7 +2160,8 @@ class PIRemover:
                 add_positions(self._redact_emails(text), "regex", 1.0)
 
             # LAYER 4: GOVERNMENT/NATIONAL IDs
-            add_positions(self._redact_government_ids(text), "regex_high_specificity", 1.0)
+            if self.config.redact_government_ids:
+                add_positions(self._redact_government_ids(text), "regex_high_specificity", 1.0)
 
             # LAYER 5: PHONE NUMBERS
             if self.config.redact_phones:
@@ -2194,6 +2195,12 @@ class PIRemover:
 
             # LAYER 11: PAYMENT & FINANCIAL
             add_positions(self._redact_upi_ids(text), "regex", 1.0)
+            if self.config.redact_banking:
+                add_positions(self._redact_banking(text), "regex", 1.0)
+            if self.config.redact_financial:
+                add_positions(self._redact_financial(text), "regex", 1.0)
+            if self.config.redact_dob:
+                add_positions(self._redact_dob(text), "regex", 0.9)
 
             # LAYER 12: ACTIVE DIRECTORY
             if self.config.redact_active_directory:
