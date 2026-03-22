@@ -589,9 +589,8 @@ app.add_exception_handler(Exception, create_secure_error_handler())
 # Static files and templates
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+# Autoescape enabled by default in Jinja2Templates._create_env (XSS prevention)
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-# Enable Jinja2 autoescape to prevent XSS (H1 fix)
-templates.env.autoescape = True
 
 # Job Storage (in-memory - use Redis for production horizontal scaling)
 jobs: Dict[str, Dict[str, Any]] = {}
@@ -893,8 +892,7 @@ async def redact_batch_via_api(texts: List[str], fast_mode: bool = False) -> Lis
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Serve the main HTML page."""
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "version": __version__
     })
 
