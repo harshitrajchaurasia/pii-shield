@@ -52,3 +52,9 @@ docker/volumes/
 CLAUDE.md
 .claude/
 docs/
+
+# Documentation (kept locally, not tracked)
+CHANGELOG.md
+PREPROCESSING_LOGIC.md
+SECURITY.md
+api_service/README.md

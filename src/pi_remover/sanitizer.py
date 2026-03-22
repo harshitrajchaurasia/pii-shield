@@ -123,7 +123,6 @@ def get_control_char_pattern(config: SanitizerConfig) -> re.Pattern:
         allowed.append(r"\x09")
     
     if allowed:
-        allowed_str = "".join(allowed)
         # Match control chars except allowed ones
         return re.compile("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]")
     else:
@@ -322,7 +321,7 @@ class InputSanitizer:
             return text
         
         try:
-            return unicodedata.normalize(form, text)
+            return unicodedata.normalize(form, text)  # type: ignore[arg-type]
         except Exception as e:
             logger.warning(f"Unicode normalization failed: {e}")
             return text
@@ -424,8 +423,8 @@ class InputSanitizer:
         Returns:
             Tuple of (sanitized_text, list_of_warnings)
         """
-        warnings = []
-        
+        warnings: List[str] = []
+
         if not text:
             return text, warnings
         

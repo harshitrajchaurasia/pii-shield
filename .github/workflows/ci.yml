@@ -10,7 +10,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true # Informational — existing code has lint issues
+    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +45,7 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
-    continue-on-error: true # Informational
+    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e ".[api,excel]"
-          pip install mypy
+          pip install mypy types-PyYAML
 
       - name: Run mypy
-        run: mypy src/pi_remover --ignore-missing-imports
+        run: mypy src/pi_remover

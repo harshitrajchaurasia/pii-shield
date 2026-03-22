@@ -29,7 +29,7 @@ try:
     from .ner import SpacyNER, SPACY_AVAILABLE
 except ImportError:
     SPACY_AVAILABLE = False
-    SpacyNER = None
+    SpacyNER = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class PIRemover:
         self.config = config or PIRemoverConfig()
         self.patterns = PIPatterns()
         # Use spacy_model from config (v2.7.1)
-        if SpacyNER:
+        if SpacyNER is not None:
             self.ner = SpacyNER(model_name=self.config.spacy_model)
         else:
             self.ner = None
@@ -201,7 +201,7 @@ class PIRemover:
                 self._last_names.add(name_lower)
             self._all_names.add(name_lower)
 
-    def _get_token(self, pi_type: str, subtype: str = None) -> str:
+    def _get_token(self, pi_type: str, subtype: Optional[str] = None) -> str:
         """
         Get replacement token for a PI type with optional subtype.
 
@@ -346,20 +346,16 @@ class PIRemover:
             local_part = email.split('@')[0] if '@' in email else ''
             
             # v2.13.1: Check if this is an employee ID-based email
-            is_emp_id_email = False
-            
             # Case 1: Numeric local part on TCS domain (1234567@tcs.com)
             if local_part.isdigit() and len(local_part) >= 4 and len(local_part) <= 7:
                 if domain in emp_id_domains:
-                    is_emp_id_email = True
                     positions.append((match.start(), match.end(), "[EMP_ID]@[DOMAIN]"))
                     continue
-            
+
             # Case 2: Prefixed account (ad.1234567@domain.com)
             if '.' in local_part:
                 prefix, rest = local_part.split('.', 1)
                 if prefix in emp_id_prefixes and rest.isdigit() and len(rest) >= 4 and len(rest) <= 7:
-                    is_emp_id_email = True
                     positions.append((match.start(), match.end(), f"{prefix.upper()}.[EMP_ID]@[DOMAIN]"))
                     continue
             
@@ -368,7 +364,6 @@ class PIRemover:
         
         # v2.14.0: Detect partial/orphaned email patterns like ".lastname@tcs.com"
         for match in self.patterns.EMAIL_PARTIAL_LASTNAME.finditer(text):
-            email_fragment = match.group(0)
             # Avoid double-detection by checking if already covered
             if not any(s <= match.start() < e for s, e, _ in positions):
                 positions.append((match.start(), match.end(), self._get_token("EMAIL")))
@@ -381,8 +376,8 @@ class PIRemover:
 
         Returns tokens like [PHONE_IN], [PHONE_UK], [PHONE_US], etc.
         """
-        positions = []
-        detected_ranges = set()
+        positions: List[Tuple[int, int, str]] = []
+        detected_ranges: set[Tuple[int, int]] = set()
 
         # Country-specific patterns with granular tokens
         # Format: (pattern, country_code)
@@ -610,7 +605,6 @@ class PIRemover:
         def is_negative_context(text_before: str, text_after: str) -> bool:
             """Check if context indicates this is NOT an employee ID."""
             before_lower = text_before.lower()
-            after_lower = text_after.lower()
             
             # Check negative keywords
             for kw in negative_keywords:
@@ -943,7 +937,7 @@ class PIRemover:
 
     def _redact_names_ner(self, text: str) -> List[Tuple[int, int, str]]:
         """Use NER to detect names."""
-        positions = []
+        positions: List[Tuple[int, int, str]] = []
         if not self.config.enable_ner or not self.ner or not self.ner._loaded:
             return positions
 

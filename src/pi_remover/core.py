@@ -80,11 +80,11 @@ from .processors import (
 # Backward compatible exports
 # Security validation (optional - for file processing)
 try:
-    from .security import validate_file_security, SecurityConfig
+    from .security import validate_file_security  # noqa: F401
     SECURITY_AVAILABLE = True
 except ImportError:
     SECURITY_AVAILABLE = False
-    def validate_file_security(path, strict=True):
+    def validate_file_security(path, strict=True):  # type: ignore[misc]
         return True, None
 
 # Resource monitoring for auto-scaling (optional)
@@ -93,18 +93,14 @@ import sys
 try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from shared.resource_monitor import (
-        ResourceMonitor, 
-        get_platform_info, 
-        ScalingConfig,
-        AdaptiveWorkerPool,
-        OSType,
-        CloudProvider
+        ResourceMonitor,
+        get_platform_info,
     )
     RESOURCE_MONITOR_AVAILABLE = True
 except ImportError:
     RESOURCE_MONITOR_AVAILABLE = False
-    ResourceMonitor = None
-    get_platform_info = None
+    ResourceMonitor = None  # type: ignore[assignment,misc]
+    get_platform_info = None  # type: ignore[assignment]
 
 # CLI Support
 def main():
@@ -183,6 +179,8 @@ Examples:
         sys.exit(1)
 
 
+run_cli = main  # Alias used by pyproject.toml entry point and __main__.py
+
 if __name__ == "__main__":
     main()
 
@@ -249,4 +247,5 @@ __all__ = [
     
     # CLI
     "main",
+    "run_cli",
 ]
