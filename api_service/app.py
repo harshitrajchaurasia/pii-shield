@@ -41,6 +41,7 @@ from pi_remover.core import (
 from pi_remover.security import (
     verify_bearer_token,
     generate_auth_token,
+    revoke_token,
     AuthRequest,
     TokenResponse,
     InputValidator,
@@ -245,7 +246,11 @@ setup_security(
 # CORS middleware - restrict in production
 allowed_origins = SecurityConfig.CORS_ORIGINS
 if ENVIRONMENT == "production" and "*" in allowed_origins:
-    logger.warning("CORS is set to allow all origins in production. Consider restricting.")
+    logger.error(
+        "CORS is set to allow all origins in production! "
+        "Falling back to restrictive default. Set CORS_ORIGINS env var."
+    )
+    allowed_origins = []  # Block all cross-origin requests until explicitly configured
 
 app.add_middleware(
     CORSMiddleware,
@@ -558,6 +563,28 @@ class ModelsResponse(BaseModel):
 
 # --- Auth Endpoints ---
 
+# H7: Simple in-memory rate limiter for auth endpoint
+_auth_attempts: Dict[str, list] = {}
+_AUTH_RATE_LIMIT = 10  # max requests per window
+_AUTH_RATE_WINDOW = 60  # seconds
+
+
+def _check_auth_rate_limit(client_ip: str) -> bool:
+    """Return True if request is allowed, False if rate-limited."""
+    import time
+    now = time.time()
+    if client_ip not in _auth_attempts:
+        _auth_attempts[client_ip] = []
+    # Clean old entries
+    _auth_attempts[client_ip] = [
+        t for t in _auth_attempts[client_ip] if now - t < _AUTH_RATE_WINDOW
+    ]
+    if len(_auth_attempts[client_ip]) >= _AUTH_RATE_LIMIT:
+        return False
+    _auth_attempts[client_ip].append(now)
+    return True
+
+
 @app.post(f"{API_PREFIX}/auth/token", response_model=TokenResponse, responses={
     401: {"model": ErrorResponse},
     429: {"model": ErrorResponse}
@@ -574,6 +601,19 @@ async def obtain_token(request: Request, body: AuthRequest):
     Authorization: Bearer <token>
     ```
     """
+    # Rate limit check for auth endpoint (H7)
+    client_ip = request.client.host if request.client else "unknown"
+    if not _check_auth_rate_limit(client_ip):
+        AuditLogger.log_security_event(
+            "auth_rate_limited",
+            request,
+            details=f"Auth rate limit exceeded for IP: {client_ip}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many authentication attempts. Try again in {_AUTH_RATE_WINDOW} seconds."
+        )
+    
     # Audit log (without secret)
     AuditLogger.log_request(
         request,
@@ -599,6 +639,28 @@ async def obtain_token(request: Request, body: AuthRequest):
     
     logger.info(f"Token issued for client: {body.client_id}")
     return token_response
+
+
+# H3: Token revocation endpoint
+@app.post(f"{API_PREFIX}/auth/revoke", responses={
+    200: {"description": "Token revoked successfully"},
+    401: {"model": ErrorResponse}
+}, tags=["Authentication"])
+async def revoke_auth_token(
+    request: Request,
+    auth_info: Dict[str, Any] = Depends(verify_bearer_token)
+):
+    """Revoke the current Bearer token so it cannot be reused."""
+    jti = auth_info.get("token_jti")
+    exp = auth_info.get("token_exp", 0)
+    if jti:
+        revoke_token(jti, exp)
+        AuditLogger.log_security_event(
+            "token_revoked",
+            request,
+            details=f"Token revoked for client: {auth_info.get('client_id')}"
+        )
+    return {"message": "Token revoked successfully"}
 
 
 # --- Redaction Endpoints ---

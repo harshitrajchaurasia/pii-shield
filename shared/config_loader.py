@@ -111,7 +111,15 @@ class ConfigLoader:
         
         # Determine config file path
         if known_args.config:
-            config_path = Path(known_args.config)
+            config_path = Path(known_args.config).resolve()
+            # Security: restrict config paths to allowed directories
+            allowed_roots = cls._get_allowed_config_roots()
+            if not any(cls._is_safe_path(config_path, root) for root in allowed_roots):
+                logger.error(
+                    f"Config path '{config_path}' is outside allowed directories. "
+                    f"Allowed roots: {allowed_roots}"
+                )
+                raise ValueError(f"Config path not in allowed directories: {config_path}")
         else:
             # Look for config in standard locations
             config_path = cls._find_config_file(service_name)
@@ -128,6 +136,27 @@ class ConfigLoader:
             loader.set('service.environment', known_args.environment)
         
         return loader
+
+    @staticmethod
+    def _is_safe_path(path: Path, allowed_root: Path) -> bool:
+        """Check if a resolved path is within an allowed root directory."""
+        try:
+            path.resolve().relative_to(allowed_root.resolve())
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _get_allowed_config_roots() -> List[Path]:
+        """Return list of directories where config files are allowed."""
+        # Project root (cwd) and its config subdirectory
+        cwd = Path.cwd()
+        roots = [cwd, cwd / 'config']
+        # Also allow the package's own config directory
+        pkg_root = Path(__file__).resolve().parent.parent
+        roots.append(pkg_root / 'config')
+        roots.append(pkg_root)
+        return roots
     
     @staticmethod
     def _find_config_file(service_name: str) -> Optional[Path]:

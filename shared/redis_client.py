@@ -233,8 +233,12 @@ class RedisClient:
                         f"Connected to Redis at {self.config.host}:{self.config.port}"
                     )
                 except Exception as e:
+                    # Sanitize error message to prevent Redis credentials leaking into logs
+                    err_msg = str(e)
+                    if 'password' in err_msg.lower() or '@' in err_msg:
+                        err_msg = "Connection failed (credentials redacted)"
                     logger.warning(
-                        f"Could not connect to Redis ({e}), using in-memory fallback"
+                        f"Could not connect to Redis ({err_msg}), using in-memory fallback"
                     )
                     self._client = InMemoryFallback()
                     self._is_redis = False

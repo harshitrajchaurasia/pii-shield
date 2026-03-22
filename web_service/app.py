@@ -550,6 +550,35 @@ app.add_middleware(
     allow_headers=["Content-Type", "Accept", "X-Correlation-ID"],
 )
 
+
+# H2: CSRF protection middleware — validates Origin/Referer for state-changing requests
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):
+    """Block cross-origin state-changing requests without valid Origin/Referer."""
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        origin = request.headers.get("origin")
+        referer = request.headers.get("referer")
+        host = request.headers.get("host", "")
+        
+        # Allow requests from same origin or when no origin (same-site requests)
+        if origin:
+            from urllib.parse import urlparse
+            origin_host = urlparse(origin).netloc
+            if origin_host and origin_host != host:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Cross-origin request blocked (CSRF protection)"}
+                )
+        elif referer:
+            from urllib.parse import urlparse
+            referer_host = urlparse(referer).netloc
+            if referer_host and referer_host != host:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Cross-origin request blocked (CSRF protection)"}
+                )
+    return await call_next(request)
+
 # Add request logging middleware
 if RequestLoggingMiddleware:
     app.add_middleware(RequestLoggingMiddleware, service_name='web_service')
@@ -561,6 +590,8 @@ app.add_exception_handler(Exception, create_secure_error_handler())
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+# Enable Jinja2 autoescape to prevent XSS (H1 fix)
+templates.env.autoescape = True
 
 # Job Storage (in-memory - use Redis for production horizontal scaling)
 jobs: Dict[str, Dict[str, Any]] = {}
@@ -968,7 +999,30 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
             detail=f"File type not supported. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
-    # 3. Generate secure job ID and create isolated directory
+    # 3. Early size check via Content-Length header (H8: prevent disk exhaustion)
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            declared_size = int(content_length)
+            if declared_size > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"File exceeds maximum size of {MAX_FILE_SIZE // (1024*1024)}MB"
+                )
+            if declared_size == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Empty file upload (Content-Length is 0)"
+                )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid Content-Length header"
+            )
+    else:
+        logger.warning("File upload without Content-Length header; enforcing streaming limit")
+
+    # 4. Generate secure job ID and create isolated directory
     job_id = secrets.token_hex(16)
     upload_dir = Path(UPLOAD_DIR) / "pi_remover" / job_id
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -1126,8 +1180,9 @@ async def process_file_background(
     except Exception as e:
         logger.error(f"Error processing file for job {job_id}: {e}")
         job["status"] = "failed"
-        job["message"] = f"Processing failed: {str(e)}"
-        job["error_details"] = traceback.format_exc()
+        job["message"] = f"Processing failed: {type(e).__name__}"
+        # Store detailed traceback only in logs, not in user-facing job data
+        logger.error(f"Job {job_id} traceback: {traceback.format_exc()}")
         job["failed_at"] = datetime.now().isoformat()
 
 

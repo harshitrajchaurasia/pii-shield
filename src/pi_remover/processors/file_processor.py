@@ -86,22 +86,31 @@ def validate_file(file_path: str, must_exist: bool = True) -> Path:
     
     path = Path(file_path)
     
-    if must_exist and not path.exists():
+    # Security: detect symlinks
+    if path.exists() and path.is_symlink():
+        raise ValidationError(f"Symlinks are not allowed: {file_path}")
+    
+    # Security: resolve and re-check (TOCTOU mitigation)
+    resolved = path.resolve()
+    if resolved.is_symlink():
+        raise ValidationError(f"Symlinks are not allowed: {file_path}")
+    
+    if must_exist and not resolved.exists():
         raise ValidationError(f"File not found: {file_path}")
     
-    if must_exist and not path.is_file():
+    if must_exist and not resolved.is_file():
         raise ValidationError(f"Not a file: {file_path}")
     
     # Check supported extensions
     supported_extensions = {'.csv', '.xlsx', '.xls', '.json', '.txt', '.md', '.log',
                            '.docx', '.doc', '.pptx', '.ppt', '.pdf', '.html', '.htm', '.xml'}
-    if path.suffix.lower() not in supported_extensions:
+    if resolved.suffix.lower() not in supported_extensions:
         raise ValidationError(
-            f"Unsupported file type: {path.suffix}. "
+            f"Unsupported file type: {resolved.suffix}. "
             f"Supported: {', '.join(sorted(supported_extensions))}"
         )
     
-    return path
+    return resolved
 
 
 def validate_columns(df: pd.DataFrame, columns: List[str]) -> List[str]:

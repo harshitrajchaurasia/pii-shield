@@ -147,7 +147,7 @@ fi
 echo -e "${GREEN}  ✓ Environment file found${NC}"
 
 # Check for unconfigured secrets
-if grep -q "REPLACE_WITH" "$ENV_FILE" 2>/dev/null; then
+if grep -q "REPLACE_WITH\|YOUR_.*SECRET\|YOUR_.*KEY" "$ENV_FILE" 2>/dev/null; then
     echo -e "${RED}  ✗ Environment file contains unconfigured secrets${NC}"
     echo -e "${YELLOW}    Please update all 'REPLACE_WITH...' placeholders in $ENV_FILE${NC}"
     exit 1

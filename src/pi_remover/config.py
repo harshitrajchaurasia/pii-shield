@@ -17,12 +17,24 @@ Usage:
     config = load_config_from_yaml("config.yaml")
 """
 
+import logging
 import multiprocessing as mp
 from dataclasses import dataclass, field
 from typing import Set
 
+logger = logging.getLogger(__name__)
+
 # Default CPU count fallback when detection fails
 DEFAULT_CPU_COUNT = 4
+
+# Allowed spaCy model names
+ALLOWED_SPACY_MODELS = {"en_core_web_sm", "en_core_web_md", "en_core_web_lg", "en_core_web_trf"}
+
+# Limits
+MAX_BATCH_SIZE = 100_000
+MAX_WORKERS = 64
+MAX_TEXT_LENGTH = 10_000_000  # 10MB per text input
+MAX_DICTIONARY_SIZE = 100_000  # Max entries in name dictionaries
 
 
 @dataclass
@@ -109,6 +121,31 @@ class PIRemoverConfig:
     excluded_phones: Set[str] = field(default_factory=set)  # e.g., {"1800"} for prefixes
     excluded_terms: Set[str] = field(default_factory=set)   # e.g., {"ServiceNow", "JIRA"}
     excluded_domains: Set[str] = field(default_factory=set) # e.g., {"example.com"}
+
+    def __post_init__(self):
+        """Validate configuration values after initialization."""
+        if self.spacy_model not in ALLOWED_SPACY_MODELS:
+            logger.warning(
+                f"spaCy model '{self.spacy_model}' not in allowed list "
+                f"{ALLOWED_SPACY_MODELS}. Falling back to 'en_core_web_lg'."
+            )
+            self.spacy_model = "en_core_web_lg"
+
+        if self.batch_size < 1:
+            logger.warning(f"batch_size must be >= 1, got {self.batch_size}. Using 1000.")
+            self.batch_size = 1000
+        elif self.batch_size > MAX_BATCH_SIZE:
+            logger.warning(f"batch_size {self.batch_size} exceeds max {MAX_BATCH_SIZE}. Clamping.")
+            self.batch_size = MAX_BATCH_SIZE
+
+        if self.num_workers < 1:
+            self.num_workers = max(1, (mp.cpu_count() or DEFAULT_CPU_COUNT) - 1)
+        elif self.num_workers > MAX_WORKERS:
+            logger.warning(f"num_workers {self.num_workers} exceeds max {MAX_WORKERS}. Clamping.")
+            self.num_workers = MAX_WORKERS
+
+        if self.multiprocessing_threshold < 1:
+            self.multiprocessing_threshold = 5000
 
 
 def load_config_from_yaml(yaml_path: str) -> PIRemoverConfig:
@@ -322,4 +359,9 @@ __all__ = [
     'config_to_dict',
     'config_from_dict',
     'DEFAULT_CPU_COUNT',
+    'ALLOWED_SPACY_MODELS',
+    'MAX_BATCH_SIZE',
+    'MAX_WORKERS',
+    'MAX_TEXT_LENGTH',
+    'MAX_DICTIONARY_SIZE',
 ]

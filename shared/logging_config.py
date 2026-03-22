@@ -47,7 +47,12 @@ def get_correlation_id() -> Optional[str]:
 
 def set_correlation_id(correlation_id: str) -> contextvars.Token:
     """Set the correlation ID for the current request context."""
-    return _correlation_id.set(correlation_id)
+    # Sanitize to prevent log injection (strip newlines, control chars, limit length)
+    if correlation_id:
+        sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(correlation_id))[:64]
+    else:
+        sanitized = correlation_id
+    return _correlation_id.set(sanitized)
 
 
 class PIRedactingFilter(logging.Filter):

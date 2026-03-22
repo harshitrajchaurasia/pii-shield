@@ -9,12 +9,13 @@ import re
 import json
 import time
 import logging
+import threading
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Any
 
 import pandas as pd
 
-from .config import PIRemoverConfig
+from .config import PIRemoverConfig, MAX_TEXT_LENGTH, MAX_DICTIONARY_SIZE
 from .patterns import PIPatterns
 from .dictionaries import (
     INDIAN_FIRST_NAMES, INDIAN_LAST_NAMES,
@@ -43,11 +44,14 @@ class PIRemover:
     def __init__(self, config: Optional[PIRemoverConfig] = None):
         self.config = config or PIRemoverConfig()
         self.patterns = PIPatterns()
-        # Use spacy_model from config (v2.7.1)
+        # Thread safety lock for mutable name dictionaries
+        self._name_lock = threading.Lock()
+        # Use spacy_model from config (v2.7.1) — lazy loaded on first use (C12 fix)
         if SpacyNER is not None:
-            self.ner = SpacyNER(model_name=self.config.spacy_model)
+            self._ner_class = SpacyNER
         else:
-            self.ner = None
+            self._ner_class = None
+        self.ner = None  # Lazy-loaded via _get_ner()
 
         # Precompile name sets for faster lookup (with safe fallback)
         try:
@@ -67,8 +71,45 @@ class PIRemover:
         # Load external name dictionaries if available
         self._load_external_names()
 
-        # Initialize NER if enabled
-        if self.config.enable_ner and self.ner:
+        # Precompile regex patterns used in hot paths (C4 fix)
+        self._adjacent_name_re = re.compile(r'\[NAME\]\s+([A-Z][a-z]{1,20})\b')
+        self._email_fragment_re = re.compile(
+            r'\[(?:NAME|EMP_ID)\][._]?([a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+        )
+        self._prefixed_id_re = re.compile(
+            r'(?i)\b(ad|iada|cad|ws|pr|sa|oth|vo|da|di)\.([a-z0-9]{4,}|\d{4,})\b'
+        )
+        self._email_local_split_re = re.compile(r'[._\-]')
+
+        # Negative context patterns for employee ID detection (avoid recompilation)
+        self._emp_negative_patterns = [
+            re.compile(r'(?:Rs\.?|INR|USD|\$|#)\s*$', re.IGNORECASE),
+            re.compile(r'(?:order|ref|case|ticket|sr|cr|rfc|inc)\s*#?\s*$', re.IGNORECASE),
+            re.compile(r'\d{1,2}[/.-]\d{1,2}[/.-]$'),
+            re.compile(r'v(?:ersion)?\.?\s*\d*\.?$', re.IGNORECASE),
+            re.compile(r'(?:port|error|code)\s*:?\s*$', re.IGNORECASE),
+            re.compile(r'(?:room|floor|building|seat|desk)\s*(?:no\.?|#)?\s*$', re.IGNORECASE),
+        ]
+        # Name dictionary pattern (precompiled)
+        self._name_pattern_re = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b')
+        self._caps_name_re = re.compile(r'\b([A-Z]{2,}(?:\s+[A-Z]{2,}){1,2})\b')
+        self._single_name_re = re.compile(
+            r'(?<!\w)([A-Z][a-z]{2,20})(?!\w)'
+        )
+        # Strong prefix pattern for single-name detection
+        _strong_prefixes = {
+            'dear', 'hello', 'hi', 'hey', 'mr', 'mrs', 'ms', 'dr', 'prof',
+            'contact', 'call', 'email', 'notify', 'attn', 'cc',
+        }
+        self._single_name_prefix_re = re.compile(
+            r'\b(' + '|'.join(re.escape(p) for p in _strong_prefixes) + r')[\s,.]+([A-Z][a-z]+)\b',
+            re.IGNORECASE
+        )
+        self._cn_pattern_re = re.compile(r'CN=([^,]+)', re.IGNORECASE)
+
+        # Initialize NER if enabled (lazy: only loads model on first use)
+        if self.config.enable_ner and self._ner_class is not None:
+            self.ner = self._ner_class(model_name=self.config.spacy_model)
             self.ner.load()
 
     # Verhoeff checksum tables for Aadhaar validation
@@ -140,8 +181,11 @@ class PIRemover:
     def _load_names_txt(self, path: Path) -> int:
         """Load names from plain text file (one per line)."""
         count = 0
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
             for line in f:
+                if len(self._all_names) >= MAX_DICTIONARY_SIZE:
+                    logger.warning(f"Dictionary limit reached ({MAX_DICTIONARY_SIZE}). Truncating load from {path}.")
+                    break
                 name = line.strip().lower()
                 if name and not name.startswith('#'):
                     self._all_names.add(name)
@@ -192,14 +236,18 @@ class PIRemover:
         return count
 
     def add_names(self, names: List[str], name_type: str = "all") -> None:
-        """Dynamically add names to the dictionary at runtime."""
-        for name in names:
-            name_lower = name.lower()
-            if name_type in ("first", "all"):
-                self._first_names.add(name_lower)
-            if name_type in ("last", "all"):
-                self._last_names.add(name_lower)
-            self._all_names.add(name_lower)
+        """Dynamically add names to the dictionary at runtime (thread-safe)."""
+        with self._name_lock:
+            for name in names:
+                if len(self._all_names) >= MAX_DICTIONARY_SIZE:
+                    logger.warning(f"Name dictionary at max capacity ({MAX_DICTIONARY_SIZE}). Skipping remaining.")
+                    break
+                name_lower = name.lower()
+                if name_type in ("first", "all"):
+                    self._first_names.add(name_lower)
+                if name_type in ("last", "all"):
+                    self._last_names.add(name_lower)
+                self._all_names.add(name_lower)
 
     def _get_token(self, pi_type: str, subtype: Optional[str] = None) -> str:
         """
@@ -227,17 +275,22 @@ class PIRemover:
         return word.lower() in self._all_names
 
     def _redact_by_positions(self, text: str, positions: List[Tuple[int, int, str]]) -> str:
-        """Redact text at given positions with bounds checking."""
+        """Redact text at given positions using O(N) join pattern."""
         if not positions:
             return text
-        positions = sorted(positions, key=lambda x: x[0], reverse=True)
-        result = text
+        # Sort by start position ascending for forward iteration
+        sorted_pos = sorted(positions, key=lambda x: x[0])
         text_len = len(text)
-        for start, end, replacement in positions:
-            if start < 0 or end > text_len or start >= end:
+        parts = []
+        last_end = 0
+        for start, end, replacement in sorted_pos:
+            if start < 0 or end > text_len or start >= end or start < last_end:
                 continue
-            result = result[:start] + replacement + result[end:]
-        return result
+            parts.append(text[last_end:start])
+            parts.append(replacement)
+            last_end = end
+        parts.append(text[last_end:])
+        return ''.join(parts)
 
     def _cleanup_partial_redactions(self, text: str) -> str:
         """
@@ -266,18 +319,14 @@ class PIRemover:
 
         # Pattern 3: [NAME] followed by adjacent known name (partial redaction cleanup)
         # Matches: "[NAME] Kumar", "[NAME] Singh" where last name was missed
-        adjacent_name_re = re.compile(r'\[NAME\]\s+([A-Z][a-z]{1,20})\b')
-        for match in adjacent_name_re.finditer(text):
+        for match in self._adjacent_name_re.finditer(text):
             word = match.group(1).lower()
             if word in self._all_names:
                 cleanup_positions.append((match.start(1), match.end(1), self._get_token("NAME")))
 
         # Pattern 4: Email fragment left after name redaction
         # Matches: "[NAME].smith@corp.com", "[EMP_ID]_user@company.org"
-        email_fragment_re = re.compile(
-            r'\[(?:NAME|EMP_ID)\][._]?([a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
-        )
-        for match in email_fragment_re.finditer(text):
+        for match in self._email_fragment_re.finditer(text):
             cleanup_positions.append((match.start(1), match.end(1), self._get_token("EMAIL")))
 
         # Remove overlaps and apply
@@ -459,10 +508,7 @@ class PIRemover:
 
         # Prefixed IDs with granular tokens (v2.17.0)
         # Pattern: ad.1234567, pr.1234567, iada.username, etc.
-        prefixed_pattern = re.compile(
-            r'(?i)\b(ad|iada|cad|ws|pr|sa|oth|vo|da|di)\.([a-z0-9]{4,}|\d{4,})\b'
-        )
-        for match in prefixed_pattern.finditer(text):
+        for match in self._prefixed_id_re.finditer(text):
             prefix = match.group(1).upper()  # AD, PR, IADA, etc.
             positions.append((match.start(), match.end(), self._get_token("EMP_ID", prefix)))
 
@@ -593,14 +639,7 @@ class PIRemover:
         }
         
         # Patterns that indicate non-employee numbers
-        negative_patterns = [
-            re.compile(r'(?:Rs\.?|INR|USD|\$|#)\s*$', re.IGNORECASE),  # Currency/order prefix
-            re.compile(r'(?:order|ref|case|ticket|sr|cr|rfc|inc)\s*#?\s*$', re.IGNORECASE),
-            re.compile(r'\d{1,2}[/.-]\d{1,2}[/.-]$'),  # Date prefix (12/16/)
-            re.compile(r'v(?:ersion)?\.?\s*\d*\.?$', re.IGNORECASE),  # Version prefix
-            re.compile(r'(?:port|error|code)\s*:?\s*$', re.IGNORECASE),
-            re.compile(r'(?:room|floor|building|seat|desk)\s*(?:no\.?|#)?\s*$', re.IGNORECASE),
-        ]
+        negative_patterns = self._emp_negative_patterns
         
         def is_negative_context(text_before: str, text_after: str) -> bool:
             """Check if context indicates this is NOT an employee ID."""
@@ -802,11 +841,11 @@ class PIRemover:
                 if fqdn in public_domains_exclude:
                     continue
                 # Skip if any parent domain is public
-                skip = False
-                for pub in public_domains_exclude:
-                    if fqdn.endswith('.' + pub) or fqdn == pub:
-                        skip = True
-                        break
+                parts = fqdn.split('.')
+                skip = any(
+                    '.'.join(parts[i:]) in public_domains_exclude
+                    for i in range(len(parts) - 1)
+                )
                 if not skip:
                     positions.append((match.start(1), match.end(1), self._get_token("HOSTNAME", "FQDN")))
         
@@ -1475,11 +1514,17 @@ class PIRemover:
     def _redact_names_from_email(self, text: str) -> List[Tuple[int, int, str]]:
         """Extract names correlated with email addresses (v2.5)."""
         positions = []
+        _name_regex_cache: Dict[str, re.Pattern] = {}
+
+        def _get_cached_pattern(name: str) -> re.Pattern:
+            if name not in _name_regex_cache:
+                _name_regex_cache[name] = re.compile(r'\b' + re.escape(name) + r'\b', re.IGNORECASE)
+            return _name_regex_cache[name]
 
         for match in self.patterns.EMAIL.finditer(text):
             email = match.group(0)
             local_part = email.split('@')[0].lower()
-            name_parts = re.split(r'[._\-]', local_part)
+            name_parts = self._email_local_split_re.split(local_part)
             name_parts = [p for p in name_parts if len(p) >= 2 and not p.isdigit()]
             
             if len(name_parts) >= 2:
@@ -1487,14 +1532,14 @@ class PIRemover:
                 search_start = max(0, match.start() - 100)
                 search_text = text[search_start:match.start()]
                 
-                name_pattern = re.compile(r'\b' + re.escape(first_last) + r'\b', re.IGNORECASE)
+                name_pattern = _get_cached_pattern(first_last)
                 for name_match in name_pattern.finditer(search_text):
                     actual_start = search_start + name_match.start()
                     actual_end = search_start + name_match.end()
                     positions.append((actual_start, actual_end, self._get_token("NAME")))
                 
                 last_first = name_parts[1].capitalize() + ' ' + name_parts[0].capitalize()
-                name_pattern_rev = re.compile(r'\b' + re.escape(last_first) + r'\b', re.IGNORECASE)
+                name_pattern_rev = _get_cached_pattern(last_first)
                 for name_match in name_pattern_rev.finditer(search_text):
                     actual_start = search_start + name_match.start()
                     actual_end = search_start + name_match.end()
@@ -1544,7 +1589,7 @@ class PIRemover:
             'west', 'north', 'south', 'city', 'town', 'village', 'district', 'area', 'zone',
         }
 
-        name_pattern = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b')
+        name_pattern = self._name_pattern_re
 
         for match in name_pattern.finditer(text):
             potential_name = match.group(1)
@@ -1568,7 +1613,7 @@ class PIRemover:
                 actual_end = match.end()
                 positions.append((actual_start, actual_end, self._get_token("NAME")))
 
-        caps_pattern = re.compile(r'\b([A-Z]{2,}(?:\s+[A-Z]{2,}){1,2})\b')
+        caps_pattern = self._caps_name_re
         for match in caps_pattern.finditer(text):
             potential_name = match.group(1)
             parts = potential_name.lower().split()
@@ -1576,15 +1621,7 @@ class PIRemover:
                 positions.append((match.start(), match.end(), self._get_token("NAME")))
 
         # v2.20: Single-word known name after strong context prefix (conservative)
-        strong_prefixes = {
-            'dear', 'hello', 'hi', 'hey', 'mr', 'mrs', 'ms', 'dr', 'prof',
-            'contact', 'call', 'email', 'notify', 'attn', 'cc',
-        }
-        single_name_re = re.compile(
-            r'\b(' + '|'.join(re.escape(p) for p in strong_prefixes) + r')[\s,.]+([A-Z][a-z]+)\b',
-            re.IGNORECASE
-        )
-        for match in single_name_re.finditer(text):
+        for match in self._single_name_prefix_re.finditer(text):
             name = match.group(2).lower()
             if name in self._all_names and name not in false_positive_singles:
                 positions.append((match.start(2), match.end(2), self._get_token("NAME")))
@@ -1658,8 +1695,7 @@ class PIRemover:
         
         for match in self.patterns.LDAP_DN.finditer(text):
             dn = match.group(0)
-            cn_pattern = re.compile(r'CN=([^,]+)', re.IGNORECASE)
-            for cn_match in cn_pattern.finditer(dn):
+            for cn_match in self._cn_pattern_re.finditer(dn):
                 cn_value = cn_match.group(1)
                 actual_start = match.start() + cn_match.start() + 3
                 actual_end = actual_start + len(cn_value)

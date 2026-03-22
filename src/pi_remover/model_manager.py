@@ -179,22 +179,15 @@ class SpacyModelManager:
             logger.warning(f"Model '{model_name}' not in allowed list: {cls.ALLOWED_MODELS}")
             return None
         
-        # Check if already loaded
-        if model_name in cls._models:
-            return cls._models[model_name].nlp
-        
-        # Check if previously failed
-        if model_name in cls._failed_models:
-            logger.debug(f"Model '{model_name}' previously failed to load")
-            return None
-        
-        # Load with lock (thread-safe)
+        # All checks inside lock to prevent race conditions (H4 fix)
         with cls._lock:
-            # Double-check after acquiring lock
+            # Check if already loaded
             if model_name in cls._models:
                 return cls._models[model_name].nlp
             
+            # Check if previously failed
             if model_name in cls._failed_models:
+                logger.debug(f"Model '{model_name}' previously failed to load")
                 return None
             
             # Load the model
