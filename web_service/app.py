@@ -181,6 +181,7 @@ def load_configuration() -> Dict[str, Any]:
             'max_retries': config.get('api_client.max_retries', 3) if config else 3,
         },
         'upload': {
+            'enabled': get_env_bool('FILE_UPLOAD_ENABLED', config.get('upload.enabled', True) if config else True),
             'max_file_size': int(os.environ.get('MAX_FILE_SIZE', 0)) or (config.get('upload.max_file_size', 500 * 1024 * 1024) if config else 500 * 1024 * 1024),
             'upload_dir': os.environ.get('UPLOAD_DIR') or (config.get('upload.upload_dir') if config else None),
         },
@@ -206,6 +207,7 @@ APP_CONFIG = load_configuration()
 
 # Configuration shortcuts
 LOG_LEVEL = APP_CONFIG['logging']['level']
+FILE_UPLOAD_ENABLED = APP_CONFIG['upload']['enabled']
 UPLOAD_DIR = APP_CONFIG['upload']['upload_dir'] or tempfile.gettempdir()
 MAX_FILE_SIZE = APP_CONFIG['upload']['max_file_size']
 ALLOWED_EXTENSIONS = SecurityConfig.ALLOWED_EXTENSIONS
@@ -893,7 +895,8 @@ async def redact_batch_via_api(texts: List[str], fast_mode: bool = False) -> Lis
 async def home(request: Request):
     """Serve the main HTML page."""
     return templates.TemplateResponse(request, "index.html", {
-        "version": __version__
+        "version": __version__,
+        "file_upload_enabled": FILE_UPLOAD_ENABLED
     })
 
 
@@ -973,6 +976,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     Upload a file and get its columns (for CSV/Excel).
     Returns a job_id for further processing.
     """
+    if not FILE_UPLOAD_ENABLED:
+        raise HTTPException(status_code=403, detail="File upload is temporarily disabled")
     # 1. Validate filename
     is_valid, error = InputValidator.validate_filename(file.filename)
     if not is_valid:
@@ -1103,6 +1108,8 @@ async def process_uploaded_file(
     Process an uploaded file with the specified columns.
     Processing happens in background using API service for redaction.
     """
+    if not FILE_UPLOAD_ENABLED:
+        raise HTTPException(status_code=403, detail="File upload is temporarily disabled")
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
 
