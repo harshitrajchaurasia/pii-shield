@@ -106,7 +106,7 @@
                             <div class="form-group">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <label class="form-label" style="margin-bottom: 0;">Your Prompt</label>
-                                    <button type="button" class="btn btn-secondary" onclick="pasteFromClipboard()" style="padding: 0.25rem 0.6rem; font-size: 0.7rem;" aria-label="Paste from clipboard">
+                                    <button type="button" class="btn btn-secondary" id="paste-btn" style="padding: 0.25rem 0.6rem; font-size: 0.7rem;" aria-label="Paste from clipboard">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
                                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
@@ -118,9 +118,9 @@
                                 <div id="input-counter" style="font-size: 0.7rem; color: var(--text-secondary); text-align: right; margin-top: 0.25rem;">0 / 100,000 characters</div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
                                     <span style="font-size: 0.75rem; color: var(--text-secondary); align-self: center;">Try:</span>
-                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(0)">Complaint Letter</button>
-                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(1)">Resume Review</button>
-                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="loadExample(2)">Bank Dispute</button>
+                                    <button type="button" class="btn btn-secondary" data-example="0" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Complaint Letter</button>
+                                    <button type="button" class="btn btn-secondary" data-example="1" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Resume Review</button>
+                                    <button type="button" class="btn btn-secondary" data-example="2" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Bank Dispute</button>
                                 </div>
                             </div>
 
@@ -133,7 +133,7 @@
                                 </span>
                             </label>
 
-                            <button class="btn btn-primary btn-block btn-lg mt-3" id="redact-btn" onclick="redactText()">
+                            <button class="btn btn-primary btn-block btn-lg mt-3" id="redact-btn">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                                 </svg>
@@ -187,7 +187,7 @@
                                         <div class="file-info-name" id="file-name">filename.csv</div>
                                         <div class="file-info-meta" id="file-meta">CSV • Ready to process</div>
                                     </div>
-                                    <button class="btn btn-secondary" onclick="resetFileUpload()" style="padding: 0.5rem 0.75rem;">
+                                    <button class="btn btn-secondary" id="reset-file-btn" style="padding: 0.5rem 0.75rem;">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <line x1="18" y1="6" x2="6" y2="18"/>
                                             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -209,7 +209,7 @@
                                     </span>
                                 </label>
 
-                                <button class="btn btn-primary btn-block btn-lg mt-3" id="process-btn" onclick="processFile()">
+                                <button class="btn btn-primary btn-block btn-lg mt-3" id="process-btn">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="10"/>
                                         <polyline points="12 6 12 12 16 14"/>
@@ -248,7 +248,7 @@
                                     </div>
                                 </div>
                                 <div class="action-buttons">
-                                    <button class="btn btn-success btn-lg" style="flex: 1;" onclick="downloadResult()">
+                                    <button class="btn btn-success btn-lg" id="download-result-btn" style="flex: 1;">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                             <polyline points="7 10 12 15 17 10"/>
@@ -256,7 +256,7 @@
                                         </svg>
                                         Download File
                                     </button>
-                                    <button class="btn btn-secondary btn-lg" onclick="resetFileUpload()">
+                                    <button class="btn btn-secondary btn-lg" id="process-another-btn">
                                         Process Another
                                     </button>
                                 </div>
@@ -298,14 +298,14 @@
                                     </svg>
                                     Safe Prompt for LLM
                                 </h3>
-                                <button class="btn btn-secondary" onclick="copyResult()" style="padding: 0.5rem 0.75rem; font-size: 0.8125rem;">
+                                <button class="btn btn-secondary" id="copy-result-btn" style="padding: 0.5rem 0.75rem; font-size: 0.8125rem;">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                                     </svg>
                                     Copy
                                 </button>
-                                <button class="btn btn-secondary" onclick="downloadResultAsTxt()" style="padding: 0.5rem 0.75rem; font-size: 0.8125rem;">
+                                <button class="btn btn-secondary" id="download-txt-btn" style="padding: 0.5rem 0.75rem; font-size: 0.8125rem;">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                         <polyline points="7 10 12 15 17 10"/>
