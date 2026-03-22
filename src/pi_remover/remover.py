@@ -15,7 +15,7 @@ from typing import List, Dict, Tuple, Optional, Any
 
 import pandas as pd
 
-from .config import PIRemoverConfig, MAX_TEXT_LENGTH, MAX_DICTIONARY_SIZE
+from .config import PIRemoverConfig, MAX_DICTIONARY_SIZE
 from .patterns import PIPatterns
 from .dictionaries import (
     INDIAN_FIRST_NAMES, INDIAN_LAST_NAMES,

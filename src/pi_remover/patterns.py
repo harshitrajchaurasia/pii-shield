@@ -56,7 +56,7 @@ class PIPatterns:
         if invalid:
             logger.error(f"Found {len(invalid)} invalid patterns: {invalid}")
         else:
-            logger.debug(f"All regex patterns validated successfully")
+            logger.debug("All regex patterns validated successfully")
         return invalid
 
     # =========================================================================
