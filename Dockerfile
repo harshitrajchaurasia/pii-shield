@@ -16,6 +16,9 @@ COPY src/ ./src/
 RUN pip install --no-cache-dir -e ".[api,excel]" && \
     pip install --no-cache-dir httpx pdfplumber python-docx python-pptx beautifulsoup4 lxml python-multipart
 
+# spaCy name model (NER) for Full mode
+RUN pip install --no-cache-dir spacy==3.8.18 https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
+
 # Copy web service
 COPY web_service/app.py web_service/api_client.py ./web_service/
 COPY web_service/templates ./web_service/templates/

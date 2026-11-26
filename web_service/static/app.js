@@ -23,24 +23,18 @@
                     const data = await response.json();
                     apiIsAvailable = data.api_available;
                     
-                    if (apiIsAvailable) {
-                        badge.className = 'api-status-badge online';
-                        text.textContent = 'API Online';
-                        badge.title = `API Online (${data.response_time_ms}ms)`;
-                    } else {
-                        badge.className = 'api-status-badge offline';
-                        text.textContent = 'Local Mode';
-                        badge.title = 'API unavailable - using local processing';
-                    }
+                    // Standalone deployments redact in-process; both cases are healthy.
+                    badge.className = 'api-status-badge online';
+                    text.textContent = 'Online';
+                    badge.title = 'Service is up. Text is redacted in memory and not stored.';
                 } else {
                     throw new Error('Status check failed');
                 }
             } catch (error) {
-                // If we can't reach the status endpoint, assume local mode
                 apiIsAvailable = false;
                 badge.className = 'api-status-badge offline';
-                text.textContent = 'Local Mode';
-                badge.title = 'Running in local processing mode';
+                text.textContent = 'Offline';
+                badge.title = "Couldn't reach the service";
             }
         }
 
@@ -181,12 +175,14 @@
         }
 
         const examples = [
-            "Help me write a complaint letter to my bank. My name is Rajesh Kumar, Aadhaar: 1234 5678 9012, PAN: ABCDE1234F, email: rajesh.kumar@gmail.com, phone: +91 98765 43210. The issue is with my account 50100123456789, IFSC: HDFC0001234.",
-            "Review my resume and suggest improvements: John Smith, john.smith@email.com, (555) 123-4567, SSN: 123-45-6789, DOB: March 15, 1990. I live at 123 Main Street, New York, NY 10001. Currently working at Acme Corp.",
-            "Summarize my bank dispute: My credit card 4532-1234-5678-9012 was charged Rs. 45,000 on 15/03/2025. My UPI ID is rajesh@okicici. Contact me at rajesh.k@gmail.com or +91 87654 32100. Account holder: Rajesh Kumar."
+            "Help me write a dispute letter to my bank. I'm Jessica Miller, 2417 Oak Ridge Dr, Plano, TX 75024. My Visa 4532-0151-2345-6789 was charged $1,249.99 twice on 11/03/2026. Reach me at jessica.miller@gmail.com or (972) 555-0186.",
+            "Review my resume and suggest improvements: Daniel Kim, daniel.kim@outlook.com, (206) 555-0123, Seattle, WA. Five years as a data engineer at a fintech startup, led a migration that cut cloud costs 30%.",
+            "Summarize this patient note for a referral: Maria Gonzalez, DOB 07/22/1961, MRN 88213-4, Medicare 1EG4-TE5-MK73, member ID XWZ123456789. BP 140/90, started lisinopril 10 mg. Call her daughter at 312-555-0144."
         ];
         function loadExample(index) {
-            document.getElementById('input-text').value = examples[index];
+            const input = document.getElementById('input-text');
+            input.value = examples[index];
+            input.dispatchEvent(new Event('input'));
         }
 
         async function redactText() {
@@ -210,11 +206,11 @@
                     body: JSON.stringify({ text: text, fast_mode: fastMode })
                 });
 
-                const data = await response.json();
-                
-                // Check for error response
+                const data = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    throw new Error(data.detail || data.message || 'Processing failed');
+                    let msg = typeof data.detail === 'string' ? data.detail : data.message;
+                    if (response.status === 429) msg = 'Too many requests. Please wait a minute and try again.';
+                    throw new Error(msg || `The service returned an error (${response.status}). Please try again.`);
                 }
                 
                 document.getElementById('output-text').textContent = data.redacted_text || '';
@@ -223,12 +219,14 @@
                 document.getElementById('stat-mode').textContent = fastMode ? 'Fast' : 'Full';
                 document.getElementById('empty-state').classList.add('hidden');
                 document.getElementById('text-result').classList.remove('hidden');
-                showToast(`Successfully redacted ${data.redaction_count || 0} items`);
+                const n = data.redaction_count || 0;
+                showToast(n ? `Replaced ${n} item${n === 1 ? '' : 's'} of personal data` : 'No personal data found');
             } catch (error) {
-                showToast('Error: ' + error.message, 'error');
+                const offline = error instanceof TypeError;
+                showToast(offline ? "Couldn't reach the service. Check your connection and try again." : error.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Process & Redact`;
+                btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Shield Prompt`;
             }
         }
 

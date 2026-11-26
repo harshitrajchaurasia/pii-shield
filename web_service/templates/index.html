@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PII Shield | Context-Aware PII Protection</title>
+    <title>PII Shield | Redact personal data before it reaches an AI</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=2">
 </head>
 <body>
     <header class="header">
@@ -83,7 +84,7 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="toggle-tabs">
+                        {% if file_upload_enabled %}<div class="toggle-tabs">
                             <button class="toggle-tab active" data-tab="text">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="4 7 4 4 20 4 20 7"/>
@@ -100,7 +101,7 @@
                                 </svg>
                                 File Upload
                             </button>
-                        </div>
+                        </div>{% endif %}
 
                         <div id="text-panel" class="tab-panel active">
                             <div class="form-group">
@@ -114,13 +115,13 @@
                                         Paste
                                     </button>
                                 </div>
-                                <textarea id="input-text" class="textarea" aria-label="Text to redact" placeholder="Paste your AI prompt here...&#10;&#10;Example: Help me write a complaint letter. My name is Rajesh Kumar, email rajesh.kumar@gmail.com, phone +91 98765 43210. My Aadhaar is 1234 5678 9012."></textarea>
+                                <textarea id="input-text" class="textarea" aria-label="Text to redact" placeholder="Paste your AI prompt here...&#10;&#10;Example: Help me write a dispute letter to my bank. My name is Jessica Miller, email jessica.miller@gmail.com, phone (415) 555-0132. My SSN is 123-45-6789."></textarea>
                                 <div id="input-counter" style="font-size: 0.7rem; color: var(--text-secondary); text-align: right; margin-top: 0.25rem;">0 / 100,000 characters</div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
                                     <span style="font-size: 0.75rem; color: var(--text-secondary); align-self: center;">Try:</span>
-                                    <button type="button" class="btn btn-secondary" data-example="0" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Complaint Letter</button>
+                                    <button type="button" class="btn btn-secondary" data-example="0" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Bank Dispute</button>
                                     <button type="button" class="btn btn-secondary" data-example="1" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Resume Review</button>
-                                    <button type="button" class="btn btn-secondary" data-example="2" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Bank Dispute</button>
+                                    <button type="button" class="btn btn-secondary" data-example="2" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Patient Note</button>
                                 </div>
                             </div>
 
@@ -129,7 +130,7 @@
                                 <span class="toggle-slider"></span>
                                 <span class="toggle-label">
                                     <span class="toggle-label-title">Fast Mode</span>
-                                    <span class="toggle-label-desc">Disable NER for 10x faster processing</span>
+                                    <span class="toggle-label-desc">Skip the name model: faster, but may miss some names</span>
                                 </span>
                             </label>
 
@@ -205,7 +206,7 @@
                                     <span class="toggle-slider"></span>
                                     <span class="toggle-label">
                                         <span class="toggle-label-title">Fast Mode</span>
-                                        <span class="toggle-label-desc">Disable NER for 10x faster processing</span>
+                                        <span class="toggle-label-desc">Skip the name model: faster, but may miss some names</span>
                                     </span>
                                 </label>
 
@@ -347,53 +348,59 @@
                             <line x1="12" y1="16" x2="12" y2="12"/>
                             <line x1="12" y1="8" x2="12.01" y2="8"/>
                         </svg>
-                        <span>Supported PI Types</span>
-                        <span class="pi-count">28 types</span>
+                        <span>Supported PII types</span>
+                        <span class="pi-count">US-focused, 30+ types</span>
                         <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
                     </summary>
                     <div class="pi-types-content">
-                        <div class="pi-category">
-                            <div class="pi-category-title">Identity</div>
-                            <div class="pi-tags">
-                                <span class="pi-tag" title="Personal names">[NAME]</span>
-                                <span class="pi-tag" title="Email addresses">[EMAIL]</span>
-                                <span class="pi-tag" title="Phone numbers">[PHONE]</span>
-                                <span class="pi-tag" title="Date of birth">[DOB]</span>
-                                <span class="pi-tag" title="Physical addresses">[LOCATION]</span>
-                            </div>
-                        </div>
-                        <div class="pi-category">
-                            <div class="pi-category-title">Government IDs</div>
-                            <div class="pi-tags">
-                                <span class="pi-tag" title="Aadhaar numbers">[AADHAAR]</span>
-                                <span class="pi-tag" title="PAN cards">[PAN]</span>
-                                <span class="pi-tag" title="Social Security Numbers">[SSN]</span>
-                                <span class="pi-tag" title="Passport numbers">[PASSPORT]</span>
-                                <span class="pi-tag" title="Driving license">[DL]</span>
-                            </div>
-                        </div>
-                        <div class="pi-category">
-                            <div class="pi-category-title">Financial</div>
-                            <div class="pi-tags">
-                                <span class="pi-tag" title="Credit/Debit cards">[CARD]</span>
-                                <span class="pi-tag" title="Bank account numbers">[BANK_ACCT]</span>
-                                <span class="pi-tag" title="UPI payment IDs">[UPI]</span>
-                                <span class="pi-tag" title="IFSC/SWIFT codes">[IFSC]</span>
-                            </div>
-                        </div>
-                        <div class="pi-category">
-                            <div class="pi-category-title">Digital</div>
-                            <div class="pi-tags">
-                                <span class="pi-tag" title="IP addresses">[IP]</span>
-                                <span class="pi-tag" title="URLs">[URL]</span>
-                                <span class="pi-tag" title="Usernames">[USERNAME]</span>
-                                <span class="pi-tag" title="Passwords & API keys">[CREDENTIAL]</span>
-                            </div>
+                    <div class="pi-category">
+                        <div class="pi-category-title">Identity &amp; contact</div>
+                        <div class="pi-tags">
+                            <span class="pi-tag" title="People's names">[NAME]</span>
+                            <span class="pi-tag" title="Email addresses">[EMAIL]</span>
+                            <span class="pi-tag" title="US and international phone numbers">[PHONE_US]</span>
+                            <span class="pi-tag" title="Street addresses, apartment and suite numbers">[ADDRESS]</span>
+                            <span class="pi-tag" title="ZIP codes">[ZIP]</span>
+                            <span class="pi-tag" title="Cities and places smaller than a state">[LOCATION]</span>
+                            <span class="pi-tag" title="Date of birth">[DOB]</span>
                         </div>
                     </div>
-                </details>
+                    <div class="pi-category">
+                        <div class="pi-category-title">Government &amp; tax IDs</div>
+                        <div class="pi-tags">
+                            <span class="pi-tag" title="Social Security numbers">[SSN]</span>
+                            <span class="pi-tag" title="IRS Individual Taxpayer Identification numbers">[ITIN]</span>
+                            <span class="pi-tag" title="Employer Identification numbers">[EIN]</span>
+                            <span class="pi-tag" title="Driver's license numbers">[DL]</span>
+                            <span class="pi-tag" title="Passport numbers">[PASSPORT]</span>
+                        </div>
+                    </div>
+                    <div class="pi-category">
+                        <div class="pi-category-title">Financial &amp; health</div>
+                        <div class="pi-tags">
+                            <span class="pi-tag" title="Visa, Mastercard, Amex and Discover numbers">[CARD]</span>
+                            <span class="pi-tag" title="Card security codes">[CVV]</span>
+                            <span class="pi-tag" title="Bank account numbers">[BANK_ACCOUNT]</span>
+                            <span class="pi-tag" title="ABA routing numbers">[ROUTING_NUM]</span>
+                            <span class="pi-tag" title="Medicare Beneficiary Identifiers">[MEDICARE]</span>
+                            <span class="pi-tag" title="Medical record numbers">[MRN]</span>
+                            <span class="pi-tag" title="Health plan member IDs">[MEMBER_ID]</span>
+                        </div>
+                    </div>
+                    <div class="pi-category">
+                        <div class="pi-category-title">Digital</div>
+                        <div class="pi-tags">
+                            <span class="pi-tag" title="IP addresses">[IP_V4]</span>
+                            <span class="pi-tag" title="URLs">[URL]</span>
+                            <span class="pi-tag" title="Passwords">[CREDENTIAL]</span>
+                            <span class="pi-tag" title="API keys and tokens">[API_KEY]</span>
+                        </div>
+                    </div>
+                    <p class="pi-types-note" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.75rem;">Also covers international formats (UK, EU, India and others), IBAN/SWIFT, and IT identifiers such as hostnames and ticket IDs.</p>
+                </div>
+            </details>
             </div>
         </div>
     </main>
@@ -407,6 +414,6 @@
     </footer>
 
     <div id="toast-container" role="alert" aria-live="assertive"></div>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=2"></script>
 </body>
 </html>

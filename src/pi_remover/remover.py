@@ -39,6 +39,14 @@ __version__ = "2.19.0"
 
 
 class PIRemover:
+    _US_STATE_NAMES = frozenset(
+        "alabama alaska arizona arkansas california colorado connecticut delaware florida georgia hawaii "
+        "idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan "
+        "minnesota mississippi missouri montana nebraska nevada ohio oklahoma oregon pennsylvania "
+        "tennessee texas utah vermont virginia wisconsin wyoming".split()
+    ) | {"new hampshire", "new jersey", "new mexico", "new york state", "north carolina", "north dakota",
+         "rhode island", "south carolina", "south dakota", "west virginia", "puerto rico",
+         "us", "u.s.", "usa", "u.s.a.", "united states", "the united states", "united states of america"}
     """Main class - combines NER, regex, and dictionaries."""
 
     def __init__(self, config: Optional[PIRemoverConfig] = None):
@@ -336,22 +344,33 @@ class PIRemover:
         
         return text
 
+    @staticmethod
+    def _hit(match: re.Match, token: str) -> Tuple[int, int, str]:
+        """Position for a match. When the pattern captures the value in group 1,
+        the label before it ("SSN ", "Routing number: ") is carried in the
+        replacement so overlaps are still ranked on the full match, and
+        _remove_overlaps trims it back off so the label stays in the text."""
+        if match.re.groups and match.group(1) is not None and match.start(1) > match.start():
+            prefix = match.string[match.start():match.start(1)]
+            return (match.start(), match.end(1), prefix + token)
+        return (match.start(), match.end(), token)
+
     def _find_pattern_matches(self, text: str, pattern: re.Pattern,
                               pi_type: str) -> List[Tuple[int, int, str]]:
         """Find all matches for a pattern and return positions."""
         positions = []
         try:
             for match in pattern.finditer(text):
-                positions.append((match.start(), match.end(), self._get_token(pi_type)))
+                positions.append(self._hit(match, self._get_token(pi_type)))
         except Exception as e:
             logger.warning(f"Pattern matching failed for {pi_type}: {type(e).__name__}: {e}")
         return positions
 
     def _detect_signature_block(self, text: str) -> Optional[int]:
         """Detect where signature block starts."""
-        match = self.patterns.SIGNATURE_START.search(text)
+        match = self.patterns.SIGNATURE_START.search(text.rstrip())
         if match:
-            return match.start()
+            return match.start(1)
         return None
 
     def _remove_overlaps(self, positions: List[Tuple[int, int, str]]) -> List[Tuple[int, int, str]]:
@@ -365,7 +384,14 @@ class PIRemover:
             if start >= last_end:
                 result.append((start, end, replacement))
                 last_end = end
-        return result
+        # Trim a label carried by _hit() so only the value is replaced.
+        trimmed = []
+        for start, end, replacement in result:
+            i = replacement.find('[')
+            if i > 0:
+                start, replacement = start + i, replacement[i:]
+            trimmed.append((start, end, replacement))
+        return trimmed
 
     # =========================================================================
     # CORE REDACTION METHODS - Part 1: Email, Phone, Employee ID
@@ -867,18 +893,18 @@ class PIRemover:
             password_value = match.group(1).lower().rstrip('.,;:!?')
             if password_value in self.patterns.PASSWORD_NON_CREDENTIALS:
                 continue
-            positions.append((match.start(), match.end(), self._get_token("CREDENTIAL")))
+            positions.append(self._hit(match, self._get_token("CREDENTIAL")))
         # VPN/Remote credentials
         for match in self.patterns.VPN_CREDS.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("CREDENTIAL", "VPN")))
+            positions.append(self._hit(match, self._get_token("CREDENTIAL", "VPN")))
         # API keys and access tokens
         for match in self.patterns.API_KEY.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("API_KEY")))
+            positions.append(self._hit(match, self._get_token("API_KEY")))
         # SSH private key headers
         positions.extend(self._find_pattern_matches(text, self.patterns.SSH_KEY, "SSH_KEY"))
         # Domain ID
         for match in self.patterns.DOMAIN_ID.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("DOMAIN_ID")))
+            positions.append(self._hit(match, self._get_token("DOMAIN_ID")))
         return positions
 
     def _redact_government_ids(self, text: str) -> List[Tuple[int, int, str]]:
@@ -888,15 +914,15 @@ class PIRemover:
         for match in self.patterns.AADHAAR.finditer(text):
             candidate = re.sub(r'[\s-]', '', match.group())
             if self._verify_aadhaar(candidate):
-                positions.append((match.start(), match.end(), self._get_token("AADHAAR")))
+                positions.append(self._hit(match, self._get_token("AADHAAR")))
             else:
                 # Accept without checksum if keyword nearby (within 50 chars before)
                 prefix = text[max(0, match.start() - 50):match.start()].lower()
                 if any(kw in prefix for kw in ('aadhaar', 'aadhar', 'uid', 'uidai')):
-                    positions.append((match.start(), match.end(), self._get_token("AADHAAR")))
+                    positions.append(self._hit(match, self._get_token("AADHAAR")))
         # Aadhaar contextual: keyword + any 12-digit number (catches numbers starting with 0/1)
         for match in self.patterns.AADHAAR_CONTEXTUAL.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("AADHAAR")))
+            positions.append(self._hit(match, self._get_token("AADHAAR")))
         positions.extend(self._find_pattern_matches(text, self.patterns.PAN, "PAN"))
         positions.extend(self._find_pattern_matches(text, self.patterns.PASSPORT, "PASSPORT"))
         # Credit card moved to _redact_financial()
@@ -904,15 +930,38 @@ class PIRemover:
         positions.extend(self._find_pattern_matches(text, self.patterns.SSN, "SSN"))
         # SSN with context keyword (no separator needed)
         for match in self.patterns.SSN_CONTEXTUAL.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("SSN")))
+            positions.append(self._hit(match, self._get_token("SSN")))
         # Driving License (Indian)
         positions.extend(self._find_pattern_matches(text, self.patterns.DRIVING_LICENSE_IN, "DL"))
         # Vehicle Registration (Indian)
         positions.extend(self._find_pattern_matches(text, self.patterns.VEHICLE_REG_IN, "VEHICLE_REG"))
         # National Insurance Number (UK)
         positions.extend(self._find_pattern_matches(text, self.patterns.NIN_UK, "NIN"))
+        positions.extend(self._redact_us_ids(text))
         # Voter ID / EPIC (Indian)
         positions.extend(self._find_pattern_matches(text, self.patterns.VOTER_ID_IN, "VOTER_ID"))
+        # SSNs never start with 9; those are IRS ITINs.
+        ssn, itin = self._get_token("SSN"), self._get_token("ITIN")
+        for i, (start, end, rep) in enumerate(positions):
+            if rep.endswith(ssn) and text[start + max(rep.find('['), 0):end].startswith('9'):
+                positions[i] = (start, end, rep[:-len(ssn)] + itin)
+        return positions
+
+    def _redact_us_ids(self, text: str) -> List[Tuple[int, int, str]]:
+        """US addresses, ZIPs, cards, and US identity/health/tax numbers."""
+        p = self.patterns
+        positions = []
+        for pattern, pi_type in ((p.US_STREET_ADDRESS, "ADDRESS"), (p.US_UNIT, "ADDRESS"),
+                                 (p.CARD_AMEX, "CARD"), (p.CARD_CVV, "CVV"),
+                                 (p.PASSPORT_US, "PASSPORT"), (p.EIN, "EIN"),
+                                 (p.MEDICARE_MBI, "MEDICARE"), (p.MRN, "MRN"),
+                                 (p.MEMBER_ID, "MEMBER_ID"), (p.DOB_WRITTEN, "DOB"), (p.VIN, "VIN")):
+            positions.extend(self._find_pattern_matches(text, pattern, pi_type))
+        # Two alternatives each: keep the label, replace whichever group matched.
+        for pattern, pi_type in ((p.US_ZIP, "ZIP"), (p.DRIVERS_LICENSE_US, "DL")):
+            for m in pattern.finditer(text):
+                g = 1 if m.group(1) is not None else 2
+                positions.append((m.start(), m.end(g), text[m.start():m.start(g)] + self._get_token(pi_type)))
         return positions
 
     def _redact_banking(self, text: str) -> List[Tuple[int, int, str]]:
@@ -920,10 +969,10 @@ class PIRemover:
         positions = []
         # Bank account with explicit keyword (a/c, account)
         for match in self.patterns.BANK_ACCOUNT_IN.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("BANK_ACCOUNT", "IN")))
+            positions.append(self._hit(match, self._get_token("BANK_ACCOUNT")))
         # Bank account with transaction context (transfer to, deposit into, etc.)
         for match in self.patterns.BANK_ACCOUNT_CONTEXTUAL.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("BANK_ACCOUNT", "IN")))
+            positions.append(self._hit(match, self._get_token("BANK_ACCOUNT")))
         # IFSC Code (always redact - format is distinctive: 4 letters + 0 + 6 chars)
         positions.extend(self._find_pattern_matches(text, self.patterns.IFSC, "IFSC"))
         # IBAN
@@ -932,7 +981,7 @@ class PIRemover:
         positions.extend(self._find_pattern_matches(text, self.patterns.SWIFT, "SWIFT"))
         # US Routing number with context
         for match in self.patterns.ROUTING_NUMBER.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("ROUTING_NUM")))
+            positions.append(self._hit(match, self._get_token("ROUTING_NUM")))
         return positions
 
     def _redact_financial(self, text: str) -> List[Tuple[int, int, str]]:
@@ -942,12 +991,12 @@ class PIRemover:
         positions.extend(self._find_pattern_matches(text, self.patterns.CREDIT_CARD, "CARD"))
         # EPF/UAN with context keyword
         for match in self.patterns.EPF_UAN.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("EPF_UAN")))
+            positions.append(self._hit(match, self._get_token("EPF_UAN")))
         # EPF Member ID
         positions.extend(self._find_pattern_matches(text, self.patterns.EPF_MEMBER_ID, "EPF_ID"))
         # Insurance policy with context
         for match in self.patterns.INSURANCE_POLICY.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("INSURANCE_POLICY")))
+            positions.append(self._hit(match, self._get_token("INSURANCE_POLICY")))
         return positions
 
     def _redact_dob(self, text: str) -> List[Tuple[int, int, str]]:
@@ -955,10 +1004,10 @@ class PIRemover:
         positions = []
         # DOB with context keyword (dob, date of birth, born on)
         for match in self.patterns.DOB.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("DOB")))
+            positions.append(self._hit(match, self._get_token("DOB")))
         # Age with context keyword
         for match in self.patterns.AGE.finditer(text):
-            positions.append((match.start(), match.end(), self._get_token("AGE")))
+            positions.append(self._hit(match, self._get_token("AGE")))
         return positions
 
     def _redact_windows_paths(self, text: str) -> List[Tuple[int, int, str]]:
@@ -1066,7 +1115,13 @@ class PIRemover:
                     'bangalore', 'bengaluru', 'hyderabad', 'chennai', 'mumbai', 'pune',
                     'delhi', 'kolkata', 'noida', 'gurgaon', 'gurugram',
                 }
-                if ent_text.lower() in location_blocklist:
+                ent_lower = ent_text.lower()
+                # States and countries alone don't identify anyone (HIPAA Safe
+                # Harbor only removes units smaller than a state); short all-caps
+                # words are units/acronyms (GB, WA) and tech terms are misreads.
+                if (ent_lower in location_blocklist or ent_lower in self._US_STATE_NAMES
+                        or (ent_text.isupper() and len(ent_text) <= 3)
+                        or ent_lower in ner_false_positive_blocklist):
                     continue
                 positions.append((start, end, self._get_token("LOCATION")))
 
@@ -1250,7 +1305,7 @@ class PIRemover:
             'of', 'freeware', 'shareware', 'proprietary', 'licensed', 'opensource',
             'wifi', 'wlan', 'ssid', 'network', 'subnet', 'vrf', 'vlan',
             'enable', 'enabled', 'disabled', 'active', 'inactive',
-            # v2.16.0: from false-positive review - common action/context words
+            # v2.16.0: common action/context words
             'end', 'side', 'doing', 'checking', 'updating', 'making', 'click', 'then',
             'encryption', 'loss', 'prevention', 'data', 'disk',
             # v2.16.0: From 150K final validation - gerunds/action words after 'by'
@@ -1325,7 +1380,7 @@ class PIRemover:
             # Words from signature blocks
             'associate', 'associates', 'team', 'teams', 'customer', 'satisfaction', 'survey',
             
-            # v2.16.2: from false-positive review - additional FPs discovered
+            # v2.16.2: additional FPs from false-positive review
             # Verbs/gerunds often caught after "by"/"from" in IT tickets
             'discussed', 'reopening', 'reopened', 'mentioning', 'given', 'provided',
             'following', 'regarding', 'concerning', 'referring', 'directing', 'addressing',
@@ -1425,8 +1480,8 @@ class PIRemover:
             'mistakenly', 'multiple', 'myapp', 'myapps', 'name', 'needful', 'networking',
             'night', 'noncompliance', 'nor', 'numbers', 'offshore', 'once', 'onsite',
             'options', 'others', 'paramters', 'part', 'parts', 'patches', 'person', 'ping',
-            'place', 'pls', 'pooja', 'ports', 'post', 'power', 'prem', 'private', 'priyanka',
-            'procured', 'provide', 'purpose', 'qradar', 'rahul', 'receiver', 'recovery',
+            'place', 'pls', 'ports', 'post', 'power', 'prem', 'private', 'priyanka',
+            'procured', 'provide', 'purpose', 'qradar', 'receiver', 'recovery',
             'registered', 'reinstalling', 'relevant', 'removed', 'reopening', 'replacement',
             'replying', 'requested', 'resolved', 'respective', 'return', 'revert', 'saying',
             'secops', 'securid', 'self', 'sentinel', 'set', 'setting', 'share', 'shared',
@@ -1897,7 +1952,7 @@ class PIRemover:
         """Remove or redact signature blocks."""
         sig_start = self._detect_signature_block(text)
         if sig_start is not None:
-            return text[:sig_start] + " " + self._get_token("SIGNATURE"), True
+            return text[:sig_start] + self._get_token("SIGNATURE"), True
         return text, False
 
     # =========================================================================
@@ -2132,7 +2187,7 @@ class PIRemover:
             if self.config.enable_context_rules:
                 result, _ = self._redact_signature_block(result)
 
-            result = re.sub(r'\s{2,}', ' ', result).strip()
+            result = re.sub(r'[ \t]{2,}', ' ', result).strip()
             return result
         except Exception as e:
             logger.warning(f"Final redaction processing failed: {type(e).__name__}: {e}")
@@ -2313,7 +2368,7 @@ class PIRemover:
                     detection_method="context"
                 ))
 
-        redacted_text = re.sub(r'\s{2,}', ' ', redacted_text).strip()
+        redacted_text = re.sub(r'[ \t]{2,}', ' ', redacted_text).strip()
         processing_time = (time.perf_counter() - start_time) * 1000
 
         return RedactionResult(

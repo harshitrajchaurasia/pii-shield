@@ -337,7 +337,6 @@ class DataCleaner:
     - Replace Unicode characters (smart quotes, dashes)
     - Decode HTML entities
     - Strip control characters
-    - Normalize phone formats
     - Normalize whitespace
     """
 
@@ -402,7 +401,6 @@ class DataCleaner:
                 - normalize_unicode: Replace smart quotes, dashes
                 - decode_html: Decode HTML entities
                 - normalize_whitespace: Collapse multiple spaces
-                - normalize_phone_formats: Standardize phone separators
                 - strip_control_chars: Remove control characters
                 - fix_encoding: Fix common encoding issues
 
@@ -420,7 +418,6 @@ class DataCleaner:
         normalize_unicode = opts.get('normalize_unicode', True)
         decode_html = opts.get('decode_html', True)
         normalize_whitespace = opts.get('normalize_whitespace', True)
-        normalize_phone_formats = opts.get('normalize_phone_formats', True)
         strip_control_chars = opts.get('strip_control_chars', True)
         fix_encoding = opts.get('fix_encoding', True)
 
@@ -470,25 +467,8 @@ class DataCleaner:
         if strip_control_chars:
             result = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', result)
 
-        # 7. Normalize phone number formats (helps regex matching)
-        if normalize_phone_formats:
-            # Protect IP addresses from phone normalization by temporarily replacing them
-            ip_pattern = r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::\d{2,5})?\b'
-            ip_placeholders: Dict[str, str] = {}
-
-            def protect_ip(m: re.Match) -> str:
-                placeholder = f"__IP_PLACEHOLDER_{len(ip_placeholders)}__"
-                ip_placeholders[placeholder] = m.group(0)
-                return placeholder
-
-            result = re.sub(ip_pattern, protect_ip, result)
-
-            # Now normalize phone formats (dots/spaces between digit groups)
-            result = re.sub(r'(\+?\d{1,4})[\s.]+(\d)', r'\1 \2', result)
-
-            # Restore IP addresses
-            for placeholder, ip in ip_placeholders.items():
-                result = result.replace(placeholder, ip)
+        # 7. (removed) Rewriting '.' between digits as a space broke prices and
+        #    versions ($45.99 -> $45 99); the phone patterns accept dots already.
 
         # 8. Normalize whitespace (do this last)
         if normalize_whitespace:

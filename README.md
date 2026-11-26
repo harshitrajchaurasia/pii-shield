@@ -7,15 +7,15 @@
 
 **Context-aware PII detection - stop leaking personal data to LLMs.**
 
-When you ask ChatGPT to "review my resume" or "draft a complaint letter," your name, phone number, Aadhaar, PAN, and other personal details get sent to external servers. PII Shield sits between you and the AI - it detects and replaces personal information with safe tokens, so the AI still understands your request without ever seeing your real data.
+When you ask ChatGPT to "review my resume" or "draft a complaint letter," your name, phone number, Social Security number, account numbers and other personal details get sent to external servers. PII Shield sits between you and the AI - it detects and replaces personal information with safe tokens, so the AI still understands your request without ever seeing your real data.
 
 ```
  Your Prompt                          Safe Prompt                        AI Response
  ┌──────────────────────┐     ┌────────────────────────────┐     ┌──────────────────┐
  │ "Draft a complaint   │     │ "Draft a complaint         │     │                  │
- │  for Rajesh Kumar,   │ ──> │  for [NAME],               │ ──> │  LLM responds    │
- │  rajesh@gmail.com,   │     │  [EMAIL],                  │     │  responds safely │
- │  Aadhaar 1234 5678"  │     │  Aadhaar [AADHAAR]"        │     │                  │
+ │  for Jessica Miller, │ ──> │  for [NAME],               │ ──> │  LLM responds    │
+ │  jess@gmail.com,     │     │  [EMAIL],                  │     │  safely          │
+ │  SSN 123-45-6789"    │     │  SSN [SSN]"                │     │                  │
  └──────────────────────┘     └────────────────────────────┘     └──────────────────┘
                                       PII Shield
 ```
@@ -26,17 +26,18 @@ When you ask ChatGPT to "review my resume" or "draft a complaint letter," your n
 
 ## Why PII Shield?
 
-- You paste a prompt containing your **name, email, phone, Aadhaar, PAN, credit card number**
+- You paste a prompt containing your **name, email, phone, address, SSN, credit card number**
 - That data travels to third-party servers
 - It may be logged, cached, or used for training
-- **PII Shield strips it out first** - the AI gets `[NAME]`, `[EMAIL]`, `[AADHAAR]` instead
+- **PII Shield strips it out first** - the AI gets `[NAME]`, `[EMAIL]`, `[SSN]` instead
 
 ## Features
 
-- **35+ PII types** - names, emails, phones, Aadhaar, PAN, SSN, passport, credit cards, DOB, bank accounts, UPI, and more
+- **US formats first** - names, street addresses, ZIP codes, phones, SSN, ITIN, EIN, driver's licenses, passports, credit cards and CVVs, routing and account numbers, Medicare IDs, medical record numbers, DOB
+- **International too** - UK, EU, India and other phone and ID formats, IBAN/SWIFT
 - **Context-aware detection** - understands surrounding keywords like "transfer to", "Dear", "password:" to catch PII that simple regex misses
-- **Web UI** - paste text or drag-and-drop files (CSV, Excel, JSON, DOCX, PDF)
-- **Instant results** - regex + dictionary detection, no external API calls
+- **Web UI** - paste a prompt and copy back the safe version (file upload can be enabled for self-hosted use)
+- **Fast** - spaCy NER plus regex and dictionaries, about 20 ms per prompt, no external API calls
 - **Dark/light theme** - clean, modern interface
 - **Zero data retention** - nothing stored, nothing logged, runs locally or self-hosted
 - **Open source** - MIT licensed, free forever
@@ -46,7 +47,8 @@ When you ask ChatGPT to "review my resume" or "draft a complaint letter," your n
 ```bash
 git clone https://github.com/harshitrajchaurasia/pii-shield.git
 cd pii-shield
-pip install -e ".[api,excel]"
+pip install -e ".[api,excel,full]"
+python -m spacy download en_core_web_md
 cd web_service && uvicorn app:app --port 8082
 ```
 
@@ -55,20 +57,21 @@ Open [http://localhost:8082](http://localhost:8082) in your browser.
 ## Example
 
 **Your prompt:**
-> Help me write a complaint letter to my bank. My name is Rajesh Kumar, email rajesh.kumar@gmail.com, phone +91 98765 43210. My Aadhaar is 1234 5678 9012, PAN: ABCDE1234F. Account number 50100123456789.
+> Help me write a dispute letter to my bank. My name is Jessica Miller, email jessica.miller@gmail.com, phone (415) 555-0132. My SSN is 123-45-6789, routing number 021000021, account 4402871933.
 
 **Safe prompt (sent to AI):**
-> Help me write a complaint letter to my bank. My name is [NAME], email [EMAIL], phone [PHONE]. My Aadhaar is [AADHAAR], PAN: [PAN]. Account number [BANK_ACCT].
+> Help me write a dispute letter to my bank. My name is [NAME], email [EMAIL], phone [PHONE_US]. My SSN is [SSN], routing number [ROUTING_NUM], account [BANK_ACCOUNT].
 
-The AI writes the letter perfectly - using placeholders you can swap back in later.
+The AI can still write the letter, with placeholders you swap back in afterwards.
 
 ## PII Types Detected
 
 | Category | Types |
 |----------|-------|
-| **Identity** | Names, Email, Phone, Date of Birth, Addresses |
-| **Government IDs** | Aadhaar, PAN, SSN, Passport, Driving License |
-| **Financial** | Credit/Debit Card, Bank Account, UPI, IFSC/SWIFT |
+| **Identity** | Names, Email, Phone, Date of Birth, Street Address, ZIP, City |
+| **Government & tax IDs** | SSN, ITIN, EIN, Driver's License, Passport (plus UK NIN, Aadhaar, PAN) |
+| **Financial** | Credit/Debit Card (incl. Amex), CVV, Bank Account, Routing Number, IBAN/SWIFT |
+| **Health** | Medicare MBI, Medical Record Number, Health Plan Member ID |
 | **Digital** | IP Address, URL, Usernames, Passwords, API Keys |
 
 ## Architecture
@@ -78,7 +81,7 @@ The AI writes the letter perfectly - using placeholders you can swap back in lat
 │             │     │         PII Shield Web Service       │
 │   Browser   │────>│                                      │
 │             │     │  FastAPI + Redaction Engine (Local)   │
-│             │<────│  Regex (35+ patterns) + Dictionaries  │
+│             │<────│  spaCy NER + Regex + Dictionaries     │
 └─────────────┘     └──────────────────────────────────────┘
 ```
 
@@ -89,16 +92,17 @@ All processing happens locally - your data never leaves the server.
 ```python
 from pi_remover import PIRemover, PIRemoverConfig
 
-remover = PIRemover(PIRemoverConfig(enable_ner=False))
+remover = PIRemover(PIRemoverConfig(enable_ner=False))  # regex + dictionaries only
 
-result = remover.redact("Email rajesh@gmail.com, Aadhaar 1234 5678 9012")
-print(result.redacted_text)
-# "Email [EMAIL], Aadhaar [AADHAAR]"
+print(remover.redact("Email jessica.miller@gmail.com, SSN 123-45-6789"))
+# Email [EMAIL], SSN [SSN]
+
+details = remover.redact_with_details("...")  # .redacted_text, .redactions
 ```
 
 ## Tech Stack
 
-Python 3.11+ | FastAPI | Pandas | Pydantic | spaCy NER (optional)
+Python 3.11+ | FastAPI | Pandas | Pydantic | spaCy NER (`en_core_web_md`)
 
 ## License
 

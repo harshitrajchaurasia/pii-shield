@@ -226,6 +226,7 @@ def _get_remover(fast_mode: bool):
     if fast_mode not in _cached_removers:
         config = PIRemoverConfig(
             enable_ner=not fast_mode,
+            spacy_model=os.getenv("SPACY_MODEL", "en_core_web_md"),
             use_typed_tokens=True
         )
         _cached_removers[fast_mode] = PIRemover(config)

@@ -103,7 +103,7 @@ class PIPatterns:
 
     # US
     PHONE_US = re.compile(
-        r'\b(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b'
+        r'(?<![\w+(])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}\b'
     )
 
     # Toll-free
@@ -550,7 +550,7 @@ class PIPatterns:
 
     # "My name is X" pattern (case-insensitive)
     MY_NAME_IS = re.compile(
-        r'(?i)\bmy name is\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})'
+        r"(?i:\bmy name is)\s+([A-Z][A-Za-z'-]+(?:[ \t]+[A-Z][A-Za-z'-]+){0,2})"
     )
 
     # =========================================================================
@@ -614,8 +614,8 @@ class PIPatterns:
 
     # Signature line patterns - "- Rahul" or "-- John Smith"
     NAME_SIGNATURE_LINE = re.compile(
-        r'(?:^|\n)\s*[-–—]{1,2}\s*([A-Za-z]+(?:\s+[A-Za-z]+)?)',
-        re.MULTILINE | re.IGNORECASE
+        r'(?:^|\n)[ \t]*(?:--|[–—])[ \t]*([A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?)',  # not '- ' bullets
+        re.MULTILINE
     )
 
     # v2.16.0: Name after signature closings - "Thanks, Krishna" or "Regards Ramesh"
@@ -634,12 +634,61 @@ class PIPatterns:
     # Signature block patterns
     # ReDoS safety: Trailing match bounded to 200 chars via [^\n]{0,200}.
     # Inner \s* quantifiers are safe (single-char class, no nesting).
+    # A sign-off alone on its line ("Thanks," / "Best regards") followed by at
+    # most 5 short lines that end the text. Group 1 is the block after it.
     SIGNATURE_START = re.compile(
-        r'(?i)\b(?:thanks?(?:\s{0,5}(?:and|&)\s{0,5}regards?)?|'
-        r'thank\s{0,5}you|regards?|best(?:\s{0,5}regards?)?|'
-        r'warm(?:\s{0,5}regards?)?|sincerely|cheers)\b[^\n]{0,200}',
-        re.MULTILINE
+        r'(?im)^[ \t]*(?:thanks?(?:\s+(?:and|&)\s+regards?)?|thank\s+you|many\s+thanks|'
+        r'(?:best|kind|warm(?:est)?)?\s*regards?|best(?:\s+wishes)?|sincerely(?:\s+yours)?|'
+        r'yours\s+(?:truly|sincerely)|respectfully|cheers)[ \t]*[,.!]?[ \t]*\n'
+        r'((?:[^\n]{1,80}(?:\n|$)){1,5})\Z'
     )
+
+    # =========================================================================
+    # US IDENTIFIERS AND ADDRESSES
+    # =========================================================================
+
+    _US_STATES = (r'(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|'
+                  r'MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|PR)')
+    # "742 Evergreen Terrace", "1600 Pennsylvania Ave NW", "350 Fifth Avenue, Suite 210"
+    US_STREET_ADDRESS = re.compile(
+        r'\b\d{1,6}[ \t]+(?:[NSEW]\.?[ \t]+)?(?:[A-Z0-9][A-Za-z0-9\']*\.?[ \t]+){1,4}'
+        r'(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Place|Pl|'
+        r'Terrace|Ter|Circle|Cir|Parkway|Pkwy|Highway|Hwy|Square|Sq|Trail|Trl|Plaza|Loop|Row)\b\.?'
+        r'(?:[ \t]+(?:NE|NW|SE|SW|N|S|E|W)\b\.?)?'
+        r'(?:,?[ \t]*(?:Apt|Apartment|Suite|Ste|Unit|#)\.?[ \t]*#?[A-Z0-9-]{1,6}\b)?'
+    )
+    US_UNIT = re.compile(r'\b(?:Apt|Apartment|Suite|Ste|Unit)\.?[ \t]*#?[ \t]*(\d[A-Z0-9-]{0,5}|[A-Z]\d{0,4})\b')
+    # ZIP after a state code ("IL 62704") or a zip label
+    US_ZIP = re.compile(r'\b' + _US_STATES + r'[ \t]+(\d{5}(?:-\d{4})?)\b'
+                        r'|(?i:\bzip(?:[ \t]*code)?)[\s.:#-]*(\d{5}(?:-\d{4})?)\b')
+    # American Express: 4-6-5
+    CARD_AMEX = re.compile(r'\b3[47]\d{2}[ \t-]?\d{6}[ \t-]?\d{5}\b')
+    CARD_CVV = re.compile(r'(?i)\b(?:cvv2?|cvc2?|csc|cid|security[ \t]+code)[\s.:#-]*(\d{3,4})\b')
+    PASSPORT_US = re.compile(
+        r'(?i)\bpassport[ \t]*(?:no\.?|number|num|#)?[\s.:#-]*(?:is[ \t]+)?([A-Z]?\d{8,9})\b')
+    DRIVERS_LICENSE_US = re.compile(
+        r"(?i)\b(?:driver'?s?|driving)[ \t]+licen[cs]e[ \t]*(?:no\.?|number|num|#)?[\s.:#-]*(?:is[ \t]+)?"
+        r"((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,18}[A-Z0-9])\b"
+        r"|\bDL[ \t]*(?:no\.?|number|#)?[\s.:#-]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,18}[A-Z0-9])\b")
+    EIN = re.compile(
+        r'(?i)\b(?:EIN|FEIN|employer[ \t]+identification[ \t]+(?:number|no\.?)|federal[ \t]+tax[ \t]+id)'
+        r'[\s.:#-]*(?:is[ \t]+)?(\d{2}-?\d{7})\b')
+    # Medicare Beneficiary Identifier (MBI): 11 chars, no S/L/O/I/B/Z letters
+    MEDICARE_MBI = re.compile(
+        r'\b[1-9][AC-HJKMNP-RT-Y][AC-HJKMNP-RT-Y0-9]\d-?[AC-HJKMNP-RT-Y][AC-HJKMNP-RT-Y0-9]\d-?'
+        r'[AC-HJKMNP-RT-Y]{2}\d{2}\b')
+    MRN = re.compile(
+        r'(?i)\b(?:MRN|medical[ \t]+record[ \t]*(?:number|no\.?|#)?|patient[ \t]+(?:id|number|no\.?|#))'
+        r'[\s.:#-]*(?:is[ \t]+)?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,15})\b')
+    MEMBER_ID = re.compile(
+        r'(?i)\b(?:member|subscriber|beneficiary|insurance|health[ \t]+plan)[ \t]*(?:id|number|no\.?|#)'
+        r'[\s.:#-]*(?:is[ \t]+)?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,19})\b')
+    # Vehicle Identification Number (17 chars, no I/O/Q), with a VIN label
+    VIN = re.compile(r'(?i)\bVIN[ \t]*(?:number|no\.?|#)?[\s.:#-]*((?=[A-Z0-9]*\d)[A-HJ-NPR-Z0-9]{17})\b')
+    DOB_WRITTEN = re.compile(
+        r'(?i)\b(?:dob|date[ \t]*of[ \t]*birth|birth[ \t]*date|birthday|born[ \t]*(?:on)?)[\s.:_-]*(?:is[ \t]+)?'
+        r'((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?[ \t]+\d{1,2}(?:st|nd|rd|th)?,?[ \t]+\d{4}'
+        r'|\d{1,2}(?:st|nd|rd|th)?[ \t]+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*,?[ \t]+\d{4})')
 
     # =========================================================================
     # DATE OF BIRTH PATTERNS
