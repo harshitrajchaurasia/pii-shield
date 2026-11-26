@@ -554,6 +554,10 @@ app.add_middleware(
 
 
 # H2: CSRF protection middleware — validates Origin/Referer for state-changing requests
+# Sites allowed to POST cross-origin (e.g. a portfolio embedding the demo), comma separated.
+TRUSTED_ORIGINS = {o.strip() for o in os.environ.get("TRUSTED_ORIGINS", "").split(",") if o.strip()}
+
+
 @app.middleware("http")
 async def csrf_protection(request: Request, call_next):
     """Block cross-origin state-changing requests without valid Origin/Referer."""
@@ -566,7 +570,7 @@ async def csrf_protection(request: Request, call_next):
         if origin:
             from urllib.parse import urlparse
             origin_host = urlparse(origin).netloc
-            if origin_host and origin_host != host:
+            if origin_host and origin_host != host and origin not in TRUSTED_ORIGINS:
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "Cross-origin request blocked (CSRF protection)"}
