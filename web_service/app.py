@@ -237,7 +237,7 @@ def _get_remover(fast_mode: bool):
             enable_ner=not fast_mode,
             spacy_model=os.getenv("SPACY_MODEL", "en_core_web_md"),
             use_typed_tokens=True,
-            # Plain token names a US reader recognizes: [PHONE], not [PHONE_US].
+            # Plain token names: [PHONE], not [PHONE_US].
             use_granular_tokens=False,
             token_aliases=US_TOKEN_NAMES,
         )
