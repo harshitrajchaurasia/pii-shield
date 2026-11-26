@@ -20,7 +20,7 @@ CASES = [
      ["742 Evergreen", "62704"], ["I live at"]),
     ("Ship to 1600 Pennsylvania Ave NW, Washington, DC 20500.", ["1600 Pennsylvania", "20500"], ["Ship to"]),
     ("Apt 4B, 350 Fifth Avenue, New York, NY 10118-0110", ["350 Fifth", "10118"], []),
-    ("Visa 4111 1111 1111 1111 exp 04/28 CVV 123", ["4111", "CVV 123"], ["Visa"]),
+    ("Visa 4111 1111 1111 1111 exp 04/28 CVV 123", ["4111", "CVV 123", "04/28"], ["Visa", "exp"]),
     ("Amex 3782 822463 10005", ["822463"], ["Amex"]),
     ("Routing number 021000021, account number 000123456789.",
      ["021000021", "000123456789"], ["Routing number", "account number"]),
@@ -37,6 +37,8 @@ CASES = [
     ("Hi, I'm Sarah O'Connor from Austin, Texas.", ["Sarah", "O'Connor"], ["Hi, I'm", "from"]),
     ("password: Hunter2!", ["Hunter2"], ["password"]),
     ("VIN 1HGCM82633A004352", ["1HGCM82633A004352"], ["VIN [VIN]"]),
+    ("Server 2001:db8::1 is down.", ["db8"], ["Server", "is down."]),
+    ("License plate 7ABC123, registered in Ohio.", ["7ABC123"], ["License plate", "Ohio"]),
     ("My wife's ITIN is 912-71-4455.", ["912-71-4455"], ["[ITIN]"]),
     ("Card 4532-0151-2345-6789, call (972) 555-0186.", ["4532", "972", "0186"], ["[CARD]", "[PHONE_US]"]),
 ]
@@ -78,3 +80,10 @@ def test_details_match_text(remover):
     d = remover.redact_with_details("Email jane.doe@example.com, SSN 123-45-6789.")
     assert d.redacted_text.count("[") == len(d.redactions)
     assert {r.original for r in d.redactions} >= {"jane.doe@example.com", "123-45-6789"}
+
+
+def test_us_token_names():
+    r = PIRemover(PIRemoverConfig(enable_ner=False, use_granular_tokens=False,
+                                  token_aliases={"DL": "DRIVERS_LICENSE", "ROUTING_NUM": "ROUTING_NUMBER"}))
+    out = r.redact("Call (415) 555-0132, driver's license D1234567, routing 021000021.")
+    assert out == "Call [PHONE], driver's license [DRIVERS_LICENSE], routing [ROUTING_NUMBER]."

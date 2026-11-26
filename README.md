@@ -60,9 +60,9 @@ Open [http://localhost:8082](http://localhost:8082) in your browser.
 > Help me write a dispute letter to my bank. My name is Jessica Miller, email jessica.miller@gmail.com, phone (415) 555-0132. My SSN is 123-45-6789, routing number 021000021, account 4402871933.
 
 **Safe prompt (sent to AI):**
-> Help me write a dispute letter to my bank. My name is [NAME], email [EMAIL], phone [PHONE_US]. My SSN is [SSN], routing number [ROUTING_NUM], account [BANK_ACCOUNT].
+> Help me write a dispute letter to my bank. My name is [NAME], email [EMAIL], phone [PHONE]. My SSN is [SSN], routing number [ROUTING_NUMBER], account [BANK_ACCOUNT].
 
-The AI can still write the letter, with placeholders you swap back in afterwards.
+The AI can still write the letter, with placeholders you swap back in afterwards. (The web app uses plain names like `[PHONE]`; the library defaults to granular ones like `[PHONE_US]`, configurable with `use_granular_tokens` and `token_aliases`.)
 
 ## PII Types Detected
 

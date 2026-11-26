@@ -20,7 +20,7 @@ Usage:
 import logging
 import multiprocessing as mp
 from dataclasses import dataclass, field
-from typing import Set
+from typing import Dict, Set
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +87,7 @@ class PIRemoverConfig:
     replacement_token: str = "[REDACTED]"
     use_typed_tokens: bool = True  # [NAME], [EMAIL], etc.
     use_granular_tokens: bool = True  # v2.17.0: [EMP_ID_AD], [PHONE_IN], [TICKET_INC], etc.
+    token_aliases: Dict[str, str] = field(default_factory=dict)  # rename tokens, e.g. {"DL": "DRIVERS_LICENSE"}
 
     # Performance
     batch_size: int = 1000

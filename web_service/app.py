@@ -221,13 +221,25 @@ _executor = ThreadPoolExecutor(max_workers=4)
 _cached_removers: Dict[bool, Any] = {}
 
 
+US_TOKEN_NAMES = {
+    "ROUTING_NUM": "ROUTING_NUMBER",
+    "DL": "DRIVERS_LICENSE",
+    "IP": "IP_ADDRESS",
+    "CREDENTIAL": "PASSWORD",
+    "INSURANCE_POLICY": "POLICY_NUMBER",
+}
+
+
 def _get_remover(fast_mode: bool):
     """Get or create a cached PIRemover instance."""
     if fast_mode not in _cached_removers:
         config = PIRemoverConfig(
             enable_ner=not fast_mode,
             spacy_model=os.getenv("SPACY_MODEL", "en_core_web_md"),
-            use_typed_tokens=True
+            use_typed_tokens=True,
+            # Plain token names a US reader recognizes: [PHONE], not [PHONE_US].
+            use_granular_tokens=False,
+            token_aliases=US_TOKEN_NAMES,
         )
         _cached_removers[fast_mode] = PIRemover(config)
     return _cached_removers[fast_mode]

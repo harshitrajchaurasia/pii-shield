@@ -338,7 +338,9 @@ class PIPatterns:
         r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::\d{2,5})?\b'
     )
     IPV6 = re.compile(
-        r'\b(?:[0-9A-Fa-f]{1,4}:){2,7}[0-9A-Fa-f]{1,4}\b'
+        r'(?<![\w:])(?:(?:[0-9A-Fa-f]{1,4}:){2,7}[0-9A-Fa-f]{1,4}'
+        r'|(?:[0-9A-Fa-f]{1,4}:){1,6}:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,5})?'  # 2001:db8::1
+        r'|::(?:[0-9A-Fa-f]{1,4}:){0,5}[0-9A-Fa-f]{1,4})(?![\w:])'
     )
     MAC = re.compile(
         r'\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b'
@@ -663,6 +665,9 @@ class PIPatterns:
                         r'|(?i:\bzip(?:[ \t]*code)?)[\s.:#-]*(\d{5}(?:-\d{4})?)\b')
     # American Express: 4-6-5
     CARD_AMEX = re.compile(r'\b3[47]\d{2}[ \t-]?\d{6}[ \t-]?\d{5}\b')
+    CARD_EXPIRY = re.compile(
+        r'(?i)\b(?:exp(?:iry|iration)?(?:[ \t]+date)?|expires|valid[ \t]+thru|good[ \t]+thru)[\s.:#-]*'
+        r'((?:0[1-9]|1[0-2])[ \t]*/[ \t]*(?:\d{4}|\d{2}))\b')
     CARD_CVV = re.compile(r'(?i)\b(?:cvv2?|cvc2?|csc|cid|security[ \t]+code)[\s.:#-]*(\d{3,4})\b')
     PASSPORT_US = re.compile(
         r'(?i)\bpassport[ \t]*(?:no\.?|number|num|#)?[\s.:#-]*(?:is[ \t]+)?([A-Z]?\d{8,9})\b')
@@ -685,6 +690,9 @@ class PIPatterns:
         r'[\s.:#-]*(?:is[ \t]+)?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,19})\b')
     # Vehicle Identification Number (17 chars, no I/O/Q), with a VIN label
     VIN = re.compile(r'(?i)\bVIN[ \t]*(?:number|no\.?|#)?[\s.:#-]*((?=[A-Z0-9]*\d)[A-HJ-NPR-Z0-9]{17})\b')
+    LICENSE_PLATE_US = re.compile(
+        r'(?i)\b(?:licen[cs]e[ \t]+plate|plate[ \t]+(?:no\.?|number|#))[ \t]*(?:no\.?|number|#)?[\s.:#-]*(?:is[ \t]+)?'
+        r'((?=[A-Z0-9 -]*\d)[A-Z0-9]{1,4}[ -]?[A-Z0-9]{1,5})\b')
     DOB_WRITTEN = re.compile(
         r'(?i)\b(?:dob|date[ \t]*of[ \t]*birth|birth[ \t]*date|birthday|born[ \t]*(?:on)?)[\s.:_-]*(?:is[ \t]+)?'
         r'((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?[ \t]+\d{1,2}(?:st|nd|rd|th)?,?[ \t]+\d{4}'

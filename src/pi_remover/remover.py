@@ -273,6 +273,7 @@ class PIRemover:
             Formatted token string
         """
         if self.config.use_typed_tokens:
+            pi_type = self.config.token_aliases.get(pi_type, pi_type)
             if subtype and self.config.use_granular_tokens:
                 return f"[{pi_type}_{subtype}]"
             return f"[{pi_type}]"
@@ -952,10 +953,11 @@ class PIRemover:
         p = self.patterns
         positions = []
         for pattern, pi_type in ((p.US_STREET_ADDRESS, "ADDRESS"), (p.US_UNIT, "ADDRESS"),
-                                 (p.CARD_AMEX, "CARD"), (p.CARD_CVV, "CVV"),
+                                 (p.CARD_AMEX, "CARD"), (p.CARD_CVV, "CVV"), (p.CARD_EXPIRY, "CARD_EXPIRY"),
                                  (p.PASSPORT_US, "PASSPORT"), (p.EIN, "EIN"),
                                  (p.MEDICARE_MBI, "MEDICARE"), (p.MRN, "MRN"),
-                                 (p.MEMBER_ID, "MEMBER_ID"), (p.DOB_WRITTEN, "DOB"), (p.VIN, "VIN")):
+                                 (p.MEMBER_ID, "MEMBER_ID"), (p.DOB_WRITTEN, "DOB"), (p.VIN, "VIN"),
+                                 (p.LICENSE_PLATE_US, "LICENSE_PLATE")):
             positions.extend(self._find_pattern_matches(text, pattern, pi_type))
         # Two alternatives each: keep the label, replace whichever group matched.
         for pattern, pi_type in ((p.US_ZIP, "ZIP"), (p.DRIVERS_LICENSE_US, "DL")):
