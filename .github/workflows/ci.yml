@@ -37,10 +37,12 @@ jobs:
           cache: pip
 
       - name: Install package with test dependencies
-        run: pip install -e ".[dev,excel,api]"
+        run: |
+          pip install -e ".[dev,excel,api,full]"
+          pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
 
       - name: Run tests
-        run: pytest tests/test_remover.py tests/test_edge_cases.py -v --tb=short
+        run: pytest tests/test_remover.py tests/test_edge_cases.py tests/test_us_pii.py -v --tb=short
 
   typecheck:
     name: Type Check

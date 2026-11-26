@@ -13,7 +13,7 @@ Usage:
 """
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 
 # Initialize logger
@@ -68,7 +68,7 @@ class SpacyNER:
             model_name: Name of spaCy model to load.
                        Recommended: "en_core_web_lg" (accuracy) or "en_core_web_sm" (speed)
         """
-        self.nlp = None
+        self.nlp: Any = None
         self.model_name = model_name
         self._loaded = False
 

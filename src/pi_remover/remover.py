@@ -55,10 +55,7 @@ class PIRemover:
         # Thread safety lock for mutable name dictionaries
         self._name_lock = threading.Lock()
         # Use spacy_model from config (v2.7.1) — lazy loaded on first use (C12 fix)
-        if SpacyNER is not None:
-            self._ner_class = SpacyNER
-        else:
-            self._ner_class = None
+        self._ner_class: Optional[type] = SpacyNER  # None when spaCy isn't installed
         self.ner = None  # Lazy-loaded via _get_ner()
 
         # Precompile name sets for faster lookup (with safe fallback)
