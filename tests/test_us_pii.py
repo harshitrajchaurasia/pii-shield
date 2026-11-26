@@ -40,6 +40,8 @@ CASES = [
     ("Server 2001:db8::1 is down.", ["db8"], ["Server", "is down."]),
     ("License plate 7ABC123, registered in Ohio.", ["7ABC123"], ["License plate", "Ohio"]),
     ("My wife's ITIN is 912-71-4455.", ["912-71-4455"], ["[ITIN]"]),
+    ("Approved by Dr Alan Reyes on Monday.", ["Alan", "Reyes"], ["Approved by", "on Monday."]),
+    ("June Carter called about the renewal.", ["June", "Carter"], ["called about the renewal."]),
     ("Card 4532-0151-2345-6789, call (972) 555-0186.", ["4532", "972", "0186"], ["[CARD]", "[PHONE_US]"]),
 ]
 
@@ -52,6 +54,8 @@ CLEAN = [
     "Thanks for the help! Can you also summarize the attached report?",
     "Can you explain how Kubernetes handles pod scheduling? Use 3 nodes and 2.5 GB memory.",
     "We file jointly in California and spend summers in Colorado.",
+    "I could take maybe 30% more volume from December.",
+    "Send the quote by Friday and start the campaign in March.",
 ]
 
 

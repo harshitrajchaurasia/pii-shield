@@ -1236,6 +1236,8 @@ class PIRemover:
             'email', 'phone', 'call', 'chat', 'message', 'meeting', 'mail', 'sent',
             'today', 'yesterday', 'tomorrow', 'morning', 'evening',
             'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september',
+            'october', 'november', 'december',
             'the', 'and', 'but', 'for', 'not', 'all', 'can', 'had', 'was', 'one', 'has', 'been',
             'from', 'by', 'cc', 'bcc', 'via', 'per', 'for', 'to', 'on', 'at', 'in',
             'user', 'admin', 'customer', 'client', 'vendor', 'support', 'help',
@@ -1547,6 +1549,11 @@ class PIRemover:
                         end_strip -= 1
                     
                     cleaned_name = ' '.join(original_words[start_strip:end_strip])
+
+                    # "by Friday and start the campaign": once a non-title word is stripped from the front, what's
+                    # left no longer follows the trigger word, so it isn't a name. Titles ("from Dr Lee") still count.
+                    if any(w not in {'mr', 'mrs', 'ms', 'dr', 'sr', 'jr'} for w in original_lower_words[:start_strip]):
+                        continue
                     
                     # v2.16.0: Skip all-caps words (likely acronyms/tech terms) unless it looks like a name
                     if cleaned_name.isupper() and len(cleaned_name) <= 20:
