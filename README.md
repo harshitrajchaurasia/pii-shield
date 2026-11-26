@@ -33,8 +33,8 @@ When you ask ChatGPT to "review my resume" or "draft a complaint letter," your n
 
 ## Features
 
-- **US formats first** - names, street addresses, ZIP codes, phones, SSN, ITIN, EIN, driver's licenses, passports, credit cards and CVVs, routing and account numbers, Medicare IDs, medical record numbers, DOB
-- **International too** - UK, EU, India and other phone and ID formats, IBAN/SWIFT
+- **Personal data** - names, street addresses, ZIP codes, phones, SSN, ITIN, EIN, driver's licenses, passports, credit cards and CVVs, routing and account numbers, Medicare IDs, medical record numbers, DOB
+- **International formats** - UK, EU, India and other phone and ID formats, IBAN/SWIFT
 - **Context-aware detection** - understands surrounding keywords like "transfer to", "Dear", "password:" to catch PII that simple regex misses
 - **Web UI** - paste a prompt and copy back the safe version (file upload can be enabled for self-hosted use)
 - **Fast** - spaCy NER plus regex and dictionaries, about 20 ms per prompt, no external API calls
